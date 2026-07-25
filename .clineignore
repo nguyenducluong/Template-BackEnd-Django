@@ -1,0 +1,8 @@
+.env
+.gitignore
+.venv
+.vscode
+.docker
+logs
+venv
+**/*.mo

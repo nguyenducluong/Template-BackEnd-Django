@@ -1,0 +1,150 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Django API Server\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-01 00:00+0000\n"
+"PO-Revision-Date: 2024-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Vietnamese\n"
+"Language: vi\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+# Authentication
+msgid "Email is required"
+msgstr "Email là bắt buộc"
+
+msgid "Password is required"
+msgstr "Mật khẩu là bắt buộc"
+
+msgid "Invalid email or password"
+msgstr "Email hoặc mật khẩu không đúng"
+
+msgid "User account is disabled"
+msgstr "Tài khoản người dùng đã bị vô hiệu hóa"
+
+msgid "Old password is incorrect"
+msgstr "Mật khẩu cũ không đúng"
+
+msgid "Password changed successfully"
+msgstr "Đổi mật khẩu thành công"
+
+msgid "User registered successfully"
+msgstr "Đăng ký người dùng thành công"
+
+msgid "Token refreshed successfully"
+msgstr "Làm mới token thành công"
+
+msgid "Logged out successfully"
+msgstr "Đăng xuất thành công"
+
+# Login / Lockout (Phase 1)
+msgid "Invalid credentials or account inactive"
+msgstr "Thông tin đăng nhập không hợp lệ hoặc tài khoản không hoạt động"
+
+msgid "Invalid credentials"
+msgstr "Thông tin đăng nhập không hợp lệ"
+
+msgid "Account locked due to too many failed attempts. Try again in %(minutes)d minutes."
+msgstr "Tài khoản đã bị khóa do quá nhiều lần đăng nhập sai. Vui lòng thử lại sau %(minutes)d phút."
+
+msgid "Passwords do not match"
+msgstr "Mật khẩu không khớp"
+
+msgid "gen_id already exists"
+msgstr "gen_id đã tồn tại"
+
+msgid "knox_id already exists"
+msgstr "knox_id đã tồn tại"
+
+# Password validation (Phase 1e)
+msgid "Password must be at least 8 characters long"
+msgstr "Mật khẩu phải có ít nhất 8 ký tự"
+
+msgid "Password must contain at least one uppercase letter"
+msgstr "Mật khẩu phải chứa ít nhất một chữ hoa"
+
+msgid "Password must contain at least one lowercase letter"
+msgstr "Mật khẩu phải chứa ít nhất một chữ thường"
+
+msgid "Password must contain at least one digit"
+msgstr "Mật khẩu phải chứa ít nhất một chữ số"
+
+msgid "Password must contain at least one special character"
+msgstr "Mật khẩu phải chứa ít nhất một ký tự đặc biệt"
+
+# Rate limiting (Throttled)
+msgid "Too many requests. Please try again in %(seconds)d second(s)."
+msgstr "Quá nhiều yêu cầu. Vui lòng thử lại sau %(seconds)d giây."
+
+msgid "Too many requests. Please try again in %(minutes)d minute(s)."
+msgstr "Quá nhiều yêu cầu. Vui lòng thử lại sau %(minutes)d phút."
+
+msgid "Too many requests. Please try again later."
+msgstr "Quá nhiều yêu cầu. Vui lòng thử lại sau."
+
+# Validation
+msgid "This field is required"
+msgstr "Trường này là bắt buộc"
+
+msgid "This field may not be blank"
+msgstr "Trường này không được để trống"
+
+msgid "Ensure this field has at least 8 characters"
+msgstr "Trường này phải có ít nhất 8 ký tự"
+
+msgid "Enter a valid email address"
+msgstr "Nhập địa chỉ email hợp lệ"
+
+msgid "This email is already registered"
+msgstr "Email này đã được đăng ký"
+
+# Common
+msgid "Success"
+msgstr "Thành công"
+
+msgid "Resource created successfully"
+msgstr "Tạo tài nguyên thành công"
+
+msgid "Resource not found"
+msgstr "Không tìm thấy tài nguyên"
+
+msgid "You do not have permission to perform this action"
+msgstr "Bạn không có quyền thực hiện hành động này"
+
+msgid "Service temporarily unavailable, try again later"
+msgstr "Dịch vụ tạm thời không khả dụng, vui lòng thử lại sau"
+
+msgid "Invalid data provided"
+msgstr "Dữ liệu cung cấp không hợp lệ"
+
+msgid "Resource conflict"
+msgstr "Xung đột tài nguyên"
+
+# DRF generic errors (Accept-Language aware)
+msgid "Authentication credentials were not provided."
+msgstr "Thông tin xác thực chưa được cung cấp."
+
+msgid 'Method "%(method)s" not allowed.'
+msgstr "Phương thức \"%(method)s\" không được hỗ trợ."
+
+# Health
+msgid "healthy"
+msgstr "khỏe mạnh"
+
+msgid "unhealthy"
+msgstr "không khỏe mạnh"
+
+msgid "degraded"
+msgstr "giảm cấp"
+
+msgid "ready"
+msgstr "sẵn sàng"
+
+msgid "not ready"
+msgstr "chưa sẵn sàng"
+
+msgid "alive"
+msgstr "đang hoạt động"

@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+
+# Environment
+.env
+.env.local
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Django
+*.log
+db.sqlite3
+media/
+staticfiles/
+logs/
+locale
+
+# OS
+.DS_Store
+
+# Certs (RSA keypairs — never commit)
+certs/
+*.pem
+Thumbs.db
+
+# Project specific
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/

@@ -1,0 +1,98 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Django API Server\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-01 00:00+0000\n"
+"PO-Revision-Date: 2024-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# Authentication
+msgid "Email is required"
+msgstr "Email is required"
+
+msgid "Password is required"
+msgstr "Password is required"
+
+msgid "Invalid email or password"
+msgstr "Invalid email or password"
+
+msgid "User account is disabled"
+msgstr "User account is disabled"
+
+msgid "Old password is incorrect"
+msgstr "Old password is incorrect"
+
+msgid "Password changed successfully"
+msgstr "Password changed successfully"
+
+msgid "User registered successfully"
+msgstr "User registered successfully"
+
+msgid "Token refreshed successfully"
+msgstr "Token refreshed successfully"
+
+msgid "Logged out successfully"
+msgstr "Logged out successfully"
+
+# Validation
+msgid "This field is required"
+msgstr "This field is required"
+
+msgid "This field may not be blank"
+msgstr "This field may not be blank"
+
+msgid "Ensure this field has at least 8 characters"
+msgstr "Ensure this field has at least 8 characters"
+
+msgid "Enter a valid email address"
+msgstr "Enter a valid email address"
+
+msgid "This email is already registered"
+msgstr "This email is already registered"
+
+# Common
+msgid "Success"
+msgstr "Success"
+
+msgid "Resource created successfully"
+msgstr "Resource created successfully"
+
+msgid "Resource not found"
+msgstr "Resource not found"
+
+msgid "You do not have permission to perform this action"
+msgstr "You do not have permission to perform this action"
+
+msgid "Service temporarily unavailable, try again later"
+msgstr "Service temporarily unavailable, try again later"
+
+msgid "Invalid data provided"
+msgstr "Invalid data provided"
+
+msgid "Resource conflict"
+msgstr "Resource conflict"
+
+# Health
+msgid "healthy"
+msgstr "healthy"
+
+msgid "unhealthy"
+msgstr "unhealthy"
+
+msgid "degraded"
+msgstr "degraded"
+
+msgid "ready"
+msgstr "ready"
+
+msgid "not ready"
+msgstr "not ready"
+
+msgid "alive"
+msgstr "alive"

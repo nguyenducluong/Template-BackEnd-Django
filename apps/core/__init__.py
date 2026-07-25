@@ -1,0 +1,1 @@
+# Core application - base models, managers, and utilities

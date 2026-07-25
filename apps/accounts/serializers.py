@@ -1,0 +1,144 @@
+from django.utils.translation import gettext as _
+from rest_framework import serializers
+
+from .models import User
+from libs.auth.jwt_utils import verify_refresh_token
+
+
+class LoginSerializer(serializers.Serializer):
+    """Validate gen_id/knox_id + password and return JWT tokens."""
+
+    account = serializers.CharField(label="gen_id or knox_id")
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        from django.db.models import Q
+        from django.utils import timezone
+
+        account = attrs["account"]
+
+        # Phase 1c: Single query using Q objects instead of 2 separate queries
+        try:
+            user = User.objects.select_related("org", "shift").get(
+                Q(gen_id=account) | Q(knox_id=account)
+            )
+        except (User.DoesNotExist, User.MultipleObjectsReturned):
+            user = None
+
+        if not user or not user.is_active:
+            raise serializers.ValidationError(
+                _("Invalid credentials or account inactive")
+            )
+
+        # Phase 1d: Check account lockout
+        if user.is_account_locked():
+            remaining = (user.locked_until - timezone.now()).seconds // 60 + 1
+            raise serializers.ValidationError(
+                _("Account locked due to too many failed attempts. "
+                  "Try again in %(minutes)d minutes.") % {"minutes": remaining}
+            )
+
+        if not user.check_password(attrs["password"]):
+            # Phase 1d: Record failed login attempt
+            user.record_failed_login()
+            raise serializers.ValidationError(_("Invalid credentials"))
+
+        # Phase 1d: Reset failed login on success
+        user.reset_failed_login()
+        attrs["user"] = user
+        return attrs
+
+
+class TokenRefreshSerializer(serializers.Serializer):
+    """Refresh a JWT access token using a valid refresh token."""
+
+    refresh = serializers.CharField()
+
+    def validate(self, attrs):
+        try:
+            user = verify_refresh_token(attrs["refresh"])
+        except Exception:
+            raise serializers.ValidationError(_("Invalid or expired refresh token"))
+        attrs["user"] = user
+        return attrs
+
+
+class LogoutSerializer(serializers.Serializer):
+    """Accept a refresh token and blacklist it."""
+
+    refresh = serializers.CharField(required=True)
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """User serializer with joined Organization (hierarchy) and Shift data."""
+
+    # ---- Organization join (like view_0010_user) ----
+    # Phase 2b: Use cached fields to avoid N+1 query
+    org_id = serializers.IntegerField(source="org.id", read_only=True)
+    org_name = serializers.CharField(source="org.name", read_only=True)
+    org_level = serializers.IntegerField(source="org.level", read_only=True)
+    org_full_path = serializers.CharField(source="org.cached_full_path", read_only=True)
+    org_full_name = serializers.CharField(source="org.cached_full_name", read_only=True)
+
+    # ---- Shift join ----
+    shift_id = serializers.IntegerField(source="shift.id", read_only=True)
+    shift_vi = serializers.CharField(source="shift.shift_vi", read_only=True)
+    shift_en = serializers.CharField(source="shift.shift_en", read_only=True)
+    shift_kr = serializers.CharField(source="shift.shift_kr", read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id", "gen_id", "knox_id", "full_name", "status",
+            "is_locked", "crt_at", "upd_at",
+            # organization join
+            "org_id", "org_name", "org_level", "org_full_path", "org_full_name",
+            # shift join
+            "shift_id", "shift_vi", "shift_en", "shift_kr",
+        ]
+        read_only_fields = [
+            # Only full_name is writable (profile update via /auth/me POST);
+            # joined org/shift fields are read-only — change via admin/user API
+            "id", "gen_id", "knox_id", "status", "is_locked", "crt_at", "upd_at",
+            "org_id", "org_name", "org_level", "org_full_path", "org_full_name",
+            "shift_id", "shift_vi", "shift_en", "shift_kr",
+        ]
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    """Registration serializer with password validation."""
+
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ["id", "gen_id", "knox_id", "full_name", "org", "shift",
+                  "password", "password_confirm"]
+        read_only_fields = ["id"]
+
+    def validate_password(self, value):
+        """Phase 1e: Validate password complexity."""
+        from libs.auth.password_validation import StrongPasswordValidator
+        validator = StrongPasswordValidator()
+        validator.validate(value)
+        return value
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs.pop("password_confirm"):
+            raise serializers.ValidationError(_("Passwords do not match"))
+        return attrs
+
+    def create(self, validated_data):
+        password = validated_data.pop("password")
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Change password serializer."""
+
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, min_length=8)
