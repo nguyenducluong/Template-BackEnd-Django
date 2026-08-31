@@ -186,8 +186,10 @@ def blacklist_token(token: str) -> None:
     expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
     JWTBlacklist.objects.get_or_create(jti=jti, defaults={"expires_at": expires_at})
 
-    # Cache as fast-path (survives restarts via DB)
-    cache.set(_blacklist_key(jti), True, timeout=ttl)
+    # Cache as fast-path (survives restarts via DB). Guard: a timeout of 0
+    # means "never expire" in Django's cache API, and the token may already
+    # be at (or past) expiry — clamp to a small positive value.
+    cache.set(_blacklist_key(jti), True, timeout=max(ttl, 60))
 
 
 def is_token_blacklisted(jti: str) -> bool:

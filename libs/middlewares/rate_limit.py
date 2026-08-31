@@ -24,6 +24,8 @@ from django.core.cache import cache
 from django.utils import translation
 from django.utils.translation.trans_real import parse_accept_lang_header
 
+from libs.network import get_client_ip
+
 
 class RateLimitMiddleware:
     """Apply a global per-IP request budget stored in Redis."""
@@ -47,18 +49,31 @@ class RateLimitMiddleware:
         if not self._enabled or self._is_excluded(request.path):
             return self.get_response(request)
 
-        ident = self._get_ident(request)
+        ident = get_client_ip(request)
         if not ident:
             return self.get_response(request)
 
-        key = f"ratelimit:global:{ident}"
+        # Fixed-window counter (INCR-style): one cache entry per
+        # (IP, window bucket). Cheaper and race-safe compared to storing a
+        # list of timestamps per IP on every request.
         now = time.time()
+        bucket = int(now // self.window)
+        key = f"ratelimit:global:{ident}:{bucket}"
 
-        history = cache.get(key, [])
-        history = [t for t in history if now - t < self.window]
+        # cache.add is atomic: it only sets when the key does not exist, so
+        # concurrent requests cannot reset the counter. cache.incr then bumps
+        # it. If the counter already exceeds the budget -> 429.
+        if cache.add(key, 0, timeout=self.window):
+            count = 0
+        else:
+            try:
+                count = cache.incr(key)
+            except ValueError:
+                # Key expired between add() and incr() — treat as a fresh one.
+                count = 0
 
-        if len(history) >= self.max_requests:
-            wait = max(1, int(self.window - (now - history[0]))) if history else self.window
+        if count >= self.max_requests:
+            wait = max(1, int(self.window - (now % self.window)))
 
             # Activate the client's preferred language so the 429 message is
             # localized even though this middleware runs before LanguageMiddleware.
@@ -79,8 +94,6 @@ class RateLimitMiddleware:
                 status=429,
             )
 
-        history.append(now)
-        cache.set(key, history, timeout=self.window)
         return self.get_response(request)
 
     def _best_lang(self, header):
@@ -95,10 +108,3 @@ class RateLimitMiddleware:
     def _is_excluded(self, path):
         path = path.lower()
         return any(path.startswith(p) for p in self.excluded)
-
-    def _get_ident(self, request):
-        """Extract a stable client identifier (IP, honoring proxies)."""
-        forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
-        return request.META.get("REMOTE_ADDR", "")

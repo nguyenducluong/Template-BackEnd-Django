@@ -90,8 +90,8 @@ class FaceSearchView(APIView):
             return error_response(message=str(exc))
 
         best_match, best_similarity = face_service.find_best_match(
-            FaceEmbedding.objects.filter(is_active=True).select_related("user"),
-            query_embedding,
+            query_embedding=query_embedding,
+            queryset=FaceEmbedding.objects.filter(is_active=True).select_related("user"),
         )
 
         if best_match is not None and best_similarity >= threshold:
@@ -141,7 +141,9 @@ class FaceVerifyView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        best_similarity = face_service.find_best_match(embeddings, query_embedding)[1]
+        best_similarity = face_service.find_best_match(
+            query_embedding=query_embedding, queryset=embeddings
+        )[1]
         return success_response(data={
             "is_match": best_similarity >= DEFAULT_SIMILARITY_THRESHOLD,
             "similarity": best_similarity,

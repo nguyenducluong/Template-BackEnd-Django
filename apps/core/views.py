@@ -2,9 +2,11 @@ from rest_framework import mixins, viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 from libs.auth.throttling import ScopedRateThrottle
+from libs.responses import EnvelopeMixin
 
 
 class BaseViewSet(
+    EnvelopeMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.CreateModelMixin,

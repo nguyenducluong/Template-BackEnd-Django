@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.db import models
 
-from apps.accounts.models import User
 from apps.core.models import BaseModel
 
 # The embedding column is a native pgvector ``vector(512)`` type on
@@ -20,7 +19,7 @@ class FaceEmbedding(BaseModel):
     """Model lưu face embeddings cho user."""
 
     user = models.ForeignKey(
-        User,
+        "accounts.User",
         on_delete=models.CASCADE,
         related_name="face_embeddings",
     )

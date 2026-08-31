@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from apps.info.models import Organization, Shift
@@ -49,7 +50,6 @@ class User(models.Model):
         max_length=128,
         help_text="Hashed password (PBKDF2-SHA256).",
     )
-    is_locked = models.BooleanField(default=False)
 
     # ---- Account lockout (Phase 1d) ----
     failed_login_attempts = models.PositiveSmallIntegerField(
@@ -92,6 +92,27 @@ class User(models.Model):
         """Verify raw_password against the stored hash."""
         return check_password(raw_password, self.password)
 
+    # Password expiry / AD SSO helpers
+    @property
+    def keyCheck(self) -> int:
+        """Return 1 if user is required to change password, 0 otherwise.
+
+        Rules:
+        - Users must change password every 90 days.
+        - NOTE: AD SSO (SAML) users will be excluded once third-party SSO
+          integration is implemented (user to be added later).
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+        max_age_days = getattr(settings, "PASSWORD_MAX_AGE_DAYS", 90)
+        if self.change_pw_at and (timezone.now() - self.change_pw_at) < timedelta(days=max_age_days):
+            return 0
+        return 1
+
+    def is_password_expired(self) -> bool:
+        """Return True if the user's password is past the allowed age."""
+        return self.keyCheck == 1
+
     # Account lockout helpers
     def is_account_locked(self) -> bool:
         """Return True if account is currently locked."""
@@ -101,15 +122,28 @@ class User(models.Model):
         return False
 
     def record_failed_login(self) -> None:
-        """Increment failed login attempts and lock if threshold exceeded."""
+        """Increment failed login attempts and lock if threshold exceeded.
+
+        Uses a database-side ``F()`` expression so concurrent failed logins
+        are all counted (a read-modify-write in Python would lose updates
+        under concurrency and let an attacker keep guessing).
+        """
         from django.conf import settings
+        from django.db.models import F
         from django.utils import timezone
+
         max_attempts = getattr(settings, "ACCOUNT_LOCKOUT_MAX_ATTEMPTS", 5)
         lockout_minutes = getattr(settings, "ACCOUNT_LOCKOUT_MINUTES", 15)
-        self.failed_login_attempts += 1
-        if self.failed_login_attempts >= max_attempts:
+
+        type(self).objects.filter(pk=self.pk).update(
+            failed_login_attempts=F("failed_login_attempts") + 1,
+            upd_at=timezone.now(),
+        )
+        self.refresh_from_db(fields=["failed_login_attempts"])
+
+        if self.failed_login_attempts >= max_attempts and not self.is_account_locked():
             self.locked_until = timezone.now() + timezone.timedelta(minutes=lockout_minutes)
-        self.save(update_fields=["failed_login_attempts", "locked_until", "upd_at"])
+            self.save(update_fields=["locked_until", "upd_at"])
 
     def reset_failed_login(self) -> None:
         """Reset failed login attempts on successful login."""

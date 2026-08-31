@@ -14,13 +14,17 @@ from django.conf import settings
 from django.core.cache import cache
 from rest_framework.throttling import BaseThrottle, ScopedRateThrottle as _ScopedRateThrottle
 
+from libs.network import get_client_ip
+
 
 def _get_client_ident(request):
-    """Return a stable client identifier honoring proxy headers."""
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "")
+    """Return a stable client identifier honoring trusted proxies only.
+
+    Delegates to ``libs.network.get_client_ip`` — ``X-Forwarded-For`` is only
+    trusted when the direct peer is a configured reverse proxy, otherwise a
+    client could spoof the header to rotate its rate-limit identity.
+    """
+    return get_client_ip(request)
 
 
 class AuthRateThrottle(BaseThrottle):

@@ -42,6 +42,7 @@ LOCAL_APPS = [
     "apps.face",
     "apps.websocket",
     "apps.info",
+    "apps.ai",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -94,32 +95,80 @@ DATABASES = {
 USE_PGVECTOR = env.bool("USE_PGVECTOR", default=True)
 
 # Database Schema Routing
-# Map "app_label.model_name" to a PostgreSQL schema.
-# Models not listed here use the DB_DEFAULT_SCHEMA connection.
-DB_DEFAULT_SCHEMA = env("DB_DEFAULT_SCHEMA", default="system")
+# Map "app_label.model_name" to a PostgreSQL schema. Mỗi app được tách riêng
+# schema để "phân vùng theo nghiệp vụ":
+#
+#   accounts -> "user"      (bảng user, jwt blacklist)
+#   face     -> "face_id"   (face embeddings)
+#   info     -> "info"      (organization hierarchy, header menu, permissions)
+#
+# QUAN TRỌNG — vì sao phải đặt search_path = TẤT CẢ schema:
+#   - accounts.User có FK tới info.Organization/Shift
+#   - info có rất nhiều FK tới accounts.User
+#   - face_embeddings có FK tới accounts.User
+#   => Các schema phải "nhìn thấy" nhau. Vì vậy mỗi connection của một schema
+#      đặt search_path = [schema của nó] + [tất cả schema khác]. Bảng still được
+#      TẠO vào đúng schema của nó (sẽ đứng đầu search_path), còn FK chéo resolve
+#      được qua các schema còn lại. Đây là "phân vùng theo app", KHÔNG phải cô
+#      lập bảo mật (mọi connection vẫn đọc được toàn bộ schema).
+#
+# LƯU Ý: schema tên "user" là keyword reserved của PostgreSQL → phải quote khi
+# dùng trong search_path và CREATE SCHEMA.
+DB_DEFAULT_SCHEMA = env("DB_DEFAULT_SCHEMA", default="public")
 DB_SCHEMAS = {
-    "accounts.user": "system",
-    "face.faceembedding": "system",
-    "info.organization": "system",
+    # accounts
+    "accounts.user": "user",
+    "accounts.jwtblacklist": "user",
+    # face
+    "face.faceembedding": "face_id",
+    # info
+    "info.organization": "info",
+    "info.shift": "info",
+    "info.vendor": "info",
+    "info.material": "info",
+    "info.groupheader": "info",
+    "info.pagesheader": "info",
+    "info.systemheader": "info",
+    "info.systempower": "info",
+    "info.headerregistration": "info",
+    "info.userheaderregistration": "info",
+    "info.headerorganization": "info",
+    "info.headerorganizationuserregistration": "info",
+    "info.systempermission": "info",
+    "info.usersystempermissionregistration": "info",
 }
 
-# Point default connection to DB_DEFAULT_SCHEMA instead of public
+# Set tên schema (đã de-dupe, giữ thứ tự ổn định)
+_SCHEMA_ORDER = list(dict.fromkeys(DB_SCHEMAS.values()))
+# schema name reserved cần quote
+_RESERVED_SCHEMAS = {"user"}
+
+
+def _schema_token(name: str) -> str:
+    """Return quoted identifier nếu tên là reserved keyword."""
+    return f'"{name}"' if name in _RESERVED_SCHEMAS else name
+
+
+def _search_path(*schemas: str) -> str:
+    return ",".join(_schema_token(s) for s in schemas)
+
+
+# search_path cho connection "default": DB_DEFAULT_SCHEMA + tất cả schema app
 DATABASES["default"]["OPTIONS"] = {
     **DATABASES["default"].get("OPTIONS", {}),
-    "options": f"-c search_path={DB_DEFAULT_SCHEMA}",
+    "options": f"-c search_path={_search_path(*([DB_DEFAULT_SCHEMA] + _SCHEMA_ORDER))}",
 }
 
-# Auto-create database connections for each schema with search_path
+# Auto-create ONE connection per schema; search_path = own-first + all others,
+# để FK chéo giữa các schema resolve được.
 _base_db = DATABASES["default"]
-_all_schemas = set(DB_SCHEMAS.values()) | {DB_DEFAULT_SCHEMA}
-for _schema in _all_schemas:
-    if _schema == DB_DEFAULT_SCHEMA:
-        continue  # Already configured as "default"
+for _schema in _SCHEMA_ORDER:
+    _others = [s for s in _SCHEMA_ORDER if s != _schema]
     DATABASES[f"schema_{_schema}"] = {
         **_base_db,
         "OPTIONS": {
             **_base_db.get("OPTIONS", {}),
-            "options": f"-c search_path={_schema}",
+            "options": f"-c search_path={_search_path(_schema, *_others, DB_DEFAULT_SCHEMA)}",
         },
     }
 
@@ -236,6 +285,7 @@ REST_FRAMEWORK = {
         "user_write": env("THROTTLE_USER_WRITE", default="30/min"),
         "face": env("THROTTLE_FACE", default="20/min"),
         "core": env("THROTTLE_CORE", default="60/min"),
+        "ai": env("THROTTLE_AI", default="10/min"),
         "default": env("THROTTLE_DEFAULT", default="100/min"),
     },
     "DEFAULT_PAGINATION_CLASS": "libs.pagination.StandardPagination",
@@ -289,6 +339,11 @@ RATE_LIMIT_EXCLUDED_PREFIXES = env.list(
 # Global rate limit middleware respects these (never double-counts endpoints
 # that already have fine-grained throttles). Disable in tests/dev if noisy.
 RATE_LIMIT_EXCLUDED_PREFIXES += ["/api/v1/crypto"]
+
+# Trusted reverse proxies. X-Forwarded-For is ONLY honoured for rate limiting
+# when the direct peer (REMOTE_ADDR) is listed here — otherwise clients could
+# spoof the header to bypass per-IP limits. Example: ["10.0.0.5", "10.0.0.6"]
+TRUSTED_PROXIES = env.list("TRUSTED_PROXIES", default=[])
 
 # Account Lockout (Phase 1d)
 ACCOUNT_LOCKOUT_MAX_ATTEMPTS = env.int("ACCOUNT_LOCKOUT_MAX_ATTEMPTS", default=5)
@@ -431,3 +486,20 @@ LOGGING = {
         },
     },
 }
+
+# ---- Password Policy ----
+PASSWORD_MAX_AGE_DAYS = env.int("PASSWORD_MAX_AGE_DAYS", default=90)
+
+# ---- AI Assistant (Ollama / generic HTTP backend) ----
+OLLAMA_BASE_URL = env("OLLAMA_BASE_URL", default="http://localhost:11434")
+OLLAMA_MODEL = env("OLLAMA_MODEL", default="gemma4:latest")
+# Cold model load (8.9GB gemma4) took ~73s in testing — be generous.
+OLLAMA_TIMEOUT = env.int("OLLAMA_TIMEOUT", default=300)
+# How long the model stays loaded in memory between calls ("30m", "-1" = forever).
+OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="30m")
+
+# ---- OTP (Forgot / Reset Password) ----
+OTP_LENGTH = env.int("OTP_LENGTH", default=6)
+OTP_EXPIRY_SECONDS = env.int("OTP_EXPIRY_SECONDS", default=300)  # 5 minutes
+OTP_MAX_ATTEMPTS = env.int("OTP_MAX_ATTEMPTS", default=3)
+RESET_TOKEN_EXPIRY_SECONDS = env.int("RESET_TOKEN_EXPIRY_SECONDS", default=600)  # 10 minutes

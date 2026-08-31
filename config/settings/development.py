@@ -22,8 +22,6 @@ USE_PGVECTOR = env.bool("USE_PGVECTOR", default=True)  # noqa
 
 CACHES["default"]["BACKEND"] = "django.core.cache.backends.locmem.LocMemCache"  # noqa
 
-JWT_AUTH["ACCESS_TOKEN_LIFETIME"] = timedelta(days=1)  # noqa
-
 REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"] = (  # noqa
     "rest_framework.renderers.JSONRenderer",
     "rest_framework.renderers.BrowsableAPIRenderer",

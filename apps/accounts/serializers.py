@@ -49,6 +49,38 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
 
+class UnlockSerializer(serializers.Serializer):
+    """Unlock an account locked by failed login attempts.
+
+    User proves identity by re-entering the correct password; on success
+    the failed-attempt counter and lockout are cleared immediately
+    (no need to wait for ACCOUNT_LOCKOUT_MINUTES to elapse).
+    """
+
+    account = serializers.CharField(label="gen_id or knox_id")
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        from django.db.models import Q
+
+        account = attrs["account"]
+        try:
+            user = User.objects.get(Q(gen_id=account) | Q(knox_id=account))
+        except (User.DoesNotExist, User.MultipleObjectsReturned):
+            user = None
+
+        if not user or not user.is_active:
+            raise serializers.ValidationError(
+                _("Invalid credentials or account inactive")
+            )
+
+        if not user.check_password(attrs["password"]):
+            raise serializers.ValidationError(_("Invalid credentials"))
+
+        attrs["user"] = user
+        return attrs
+
+
 class TokenRefreshSerializer(serializers.Serializer):
     """Refresh a JWT access token using a valid refresh token."""
 
@@ -86,11 +118,15 @@ class UserSerializer(serializers.ModelSerializer):
     shift_en = serializers.CharField(source="shift.shift_en", read_only=True)
     shift_kr = serializers.CharField(source="shift.shift_kr", read_only=True)
 
+    # ---- Password policy fields ----
+    change_pw_at = serializers.DateTimeField(read_only=True)
+    keyCheck = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = User
         fields = [
             "id", "gen_id", "knox_id", "full_name", "status",
-            "is_locked", "crt_at", "upd_at",
+            "crt_at", "upd_at", "change_pw_at", "keyCheck",
             # organization join
             "org_id", "org_name", "org_level", "org_full_path", "org_full_name",
             # shift join
@@ -99,7 +135,8 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = [
             # Only full_name is writable (profile update via /auth/me POST);
             # joined org/shift fields are read-only — change via admin/user API
-            "id", "gen_id", "knox_id", "status", "is_locked", "crt_at", "upd_at",
+            "id", "gen_id", "knox_id", "status",
+            "crt_at", "upd_at", "change_pw_at", "keyCheck",
             "org_id", "org_name", "org_level", "org_full_path", "org_full_name",
             "shift_id", "shift_vi", "shift_en", "shift_kr",
         ]
@@ -137,8 +174,86 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
-class ChangePasswordSerializer(serializers.Serializer):
-    """Change password serializer."""
 
-    old_password = serializers.CharField(required=True)
+class ChangePasswordSerializer(serializers.Serializer):
+    """Change password serializer with 90-day policy and AD SSO check."""
+
+    old_password = serializers.CharField(required=False)
     new_password = serializers.CharField(required=True, min_length=8)
+
+    def validate_new_password(self, value):
+        """Validate password complexity."""
+        from libs.auth.password_validation import StrongPasswordValidator
+        validator = StrongPasswordValidator()
+        validator.validate(value)
+        return value
+
+    def validate(self, attrs):
+        user = self.context["request"].user
+
+        # If password is expired (>90 days), old_password is not required
+        if not user.is_password_expired():
+            if not attrs.get("old_password"):
+                raise serializers.ValidationError(
+                    _("Old password is required.")
+                )
+            if not user.check_password(attrs["old_password"]):
+                raise serializers.ValidationError(
+                    _("Old password is incorrect.")
+                )
+
+        attrs["user"] = user
+        return attrs
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    """Validate account identifier and trigger OTP generation."""
+
+    account = serializers.CharField(
+        help_text="gen_id or knox_id of the user requesting password reset"
+    )
+
+    def validate_account(self, value):
+        from django.db.models import Q
+        try:
+            user = User.objects.get(
+                Q(gen_id=value) | Q(knox_id=value)
+            )
+        except (User.DoesNotExist, User.MultipleObjectsReturned):
+            raise serializers.ValidationError(
+                _("No account found with this identifier.")
+            )
+        if not user.is_active:
+            raise serializers.ValidationError(
+                _("Account is inactive.")
+            )
+        self.context["user"] = user
+        return value
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    """Verify OTP and set a new password."""
+
+    account = serializers.CharField()
+    otp = serializers.CharField(min_length=4, max_length=10)
+    new_password = serializers.CharField(required=True, min_length=8)
+
+    def validate_new_password(self, value):
+        from libs.auth.password_validation import StrongPasswordValidator
+        validator = StrongPasswordValidator()
+        validator.validate(value)
+        return value
+
+    def validate(self, attrs):
+        from django.db.models import Q
+        try:
+            user = User.objects.get(
+                Q(gen_id=attrs["account"]) | Q(knox_id=attrs["account"])
+            )
+        except (User.DoesNotExist, User.MultipleObjectsReturned):
+            raise serializers.ValidationError(
+                _("No account found with this identifier.")
+            )
+        attrs["user"] = user
+        return attrs
+

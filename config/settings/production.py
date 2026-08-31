@@ -2,6 +2,21 @@ from .base import *  # noqa
 
 DEBUG = False
 
+# ---- Fail-fast production safety checks -------------------------------
+# Boot must fail loudly in production when basic security hygiene is missing,
+# instead of silently running with insecure defaults.
+_INSECURE_SECRET = str(SECRET_KEY).startswith("django-insecure-")
+if _INSECURE_SECRET:
+    raise RuntimeError(
+        "DJANGO_SECRET_KEY is not configured (still using the insecure "
+        "development default). Refusing to start in production."
+    )
+if "*" in ALLOWED_HOSTS or not ALLOWED_HOSTS:
+    raise RuntimeError(
+        "ALLOWED_HOSTS must be an explicit list in production (got "
+        f"{ALLOWED_HOSTS!r}). Set DJANGO_ALLOWED_HOSTS in the environment."
+    )
+
 SECURE_SSL_REDIRECT = True
 # Django sits behind nginx/XAMPP-Apache reverse proxy which terminates TLS.
 # Tell Django to trust the X-Forwarded-Proto header so is_secure() is correct

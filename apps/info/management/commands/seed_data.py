@@ -253,7 +253,6 @@ class Command(BaseCommand):
                 "shift": shift,
                 "status": User.StatusChoices.APPROVED,
                 "ip_remember": "127.0.0.1",
-                "is_locked": False,
             },
         )
         if created:

@@ -18,6 +18,7 @@ class StandardPagination(PageNumberPagination):
             "message": "Success",
             "errors": None,
             "meta": {
+                "status_code": 200,
                 "page": self.page.number,
                 "per_page": self.page.paginator.per_page,
                 "total": self.page.paginator.count,

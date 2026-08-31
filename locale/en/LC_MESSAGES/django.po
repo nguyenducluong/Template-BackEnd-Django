@@ -1,64 +1,120 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Django API Server\n"
-"Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-01-01 00:00+0000\n"
-"PO-Revision-Date: 2024-01-01 00:00+0000\n"
-"Last-Translator: \n"
-"Language-Team: English\n"
+"PO-Revision-Date: 2026\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
 
-# Authentication
-msgid "Email is required"
-msgstr "Email is required"
+msgid "Account is inactive."
+msgstr "Account is inactive."
 
-msgid "Password is required"
-msgstr "Password is required"
+msgid "Account locked due to too many failed attempts. Try again in %(minutes)d minutes."
+msgstr "Account locked due to too many failed attempts. Try again in %(minutes)d minutes."
 
-msgid "Invalid email or password"
-msgstr "Invalid email or password"
+msgid "Account unlocked successfully"
+msgstr "Account unlocked successfully"
 
-msgid "User account is disabled"
-msgstr "User account is disabled"
+msgid "Account unlocked successfully. You can now log in."
+msgstr "Account unlocked successfully. You can now log in."
 
-msgid "Old password is incorrect"
-msgstr "Old password is incorrect"
+msgid "Authentication credentials were not provided."
+msgstr "Authentication credentials were not provided."
+
+msgid "Error"
+msgstr "Error"
+
+msgid "Handshake successful"
+msgstr "Handshake successful"
+
+msgid "Header structure"
+msgstr "Header structure"
+
+msgid "Invalid client public key"
+msgstr "Invalid client public key"
+
+msgid "Invalid credentials"
+msgstr "Invalid credentials"
+
+msgid "Invalid credentials or account inactive"
+msgstr "Invalid credentials or account inactive"
+
+msgid "Invalid data provided"
+msgstr "Invalid data provided"
+
+msgid "Invalid data provided."
+msgstr "Invalid data provided."
+
+msgid "Invalid or expired OTP"
+msgstr "Invalid or expired OTP"
+
+msgid "Invalid or expired refresh token"
+msgstr "Invalid or expired refresh token"
+
+msgid "Login successful"
+msgstr "Login successful"
+
+msgid "Logout successful"
+msgstr "Logout successful"
+
+msgid "Method \"%(method)s\" not allowed."
+msgstr "Method \"%(method)s\" not allowed."
+
+msgid "Missing or invalid 'public_key' (RSA PEM required)"
+msgstr "Missing or invalid 'public_key' (RSA PEM required)"
+
+msgid "No account found with this identifier."
+msgstr "No account found with this identifier."
+
+msgid "OTP sent. Please check your email."
+msgstr "OTP sent. Please check your email."
+
+msgid "Old password is incorrect."
+msgstr "Old password is incorrect."
+
+msgid "Old password is required."
+msgstr "Old password is required."
+
+msgid "Password Reset OTP"
+msgstr "Password Reset OTP"
 
 msgid "Password changed successfully"
 msgstr "Password changed successfully"
 
-msgid "User registered successfully"
-msgstr "User registered successfully"
+msgid "Password must be at least %(min_length)d characters."
+msgstr "Password must be at least %(min_length)d characters."
 
-msgid "Token refreshed successfully"
-msgstr "Token refreshed successfully"
+msgid "Password must be at least 8 characters with at least one uppercase letter, one lowercase letter, one digit, and one special character."
+msgstr "Password must be at least 8 characters with at least one uppercase letter, one lowercase letter, one digit, and one special character."
 
-msgid "Logged out successfully"
-msgstr "Logged out successfully"
+msgid "Password must contain at least one digit."
+msgstr "Password must contain at least one digit."
 
-# Validation
-msgid "This field is required"
-msgstr "This field is required"
+msgid "Password must contain at least one lowercase letter."
+msgstr "Password must contain at least one lowercase letter."
 
-msgid "This field may not be blank"
-msgstr "This field may not be blank"
+msgid "Password must contain at least one special character."
+msgstr "Password must contain at least one special character."
 
-msgid "Ensure this field has at least 8 characters"
-msgstr "Ensure this field has at least 8 characters"
+msgid "Password must contain at least one uppercase letter."
+msgstr "Password must contain at least one uppercase letter."
 
-msgid "Enter a valid email address"
-msgstr "Enter a valid email address"
+msgid "Password reset successfully"
+msgstr "Password reset successfully"
 
-msgid "This email is already registered"
-msgstr "This email is already registered"
+msgid "Passwords do not match"
+msgstr "Passwords do not match"
 
-# Common
-msgid "Success"
-msgstr "Success"
+msgid "Profile updated"
+msgstr "Profile updated"
+
+msgid "Registration successful. Please wait for approval."
+msgstr "Registration successful. Please wait for approval."
+
+msgid "Resource conflict."
+msgstr "Resource conflict."
 
 msgid "Resource created successfully"
 msgstr "Resource created successfully"
@@ -66,33 +122,56 @@ msgstr "Resource created successfully"
 msgid "Resource not found"
 msgstr "Resource not found"
 
+msgid "Resource not found."
+msgstr "Resource not found."
+
+msgid "Service degraded"
+msgstr "Service degraded"
+
+msgid "Service healthy"
+msgstr "Service healthy"
+
+msgid "Service temporarily unavailable, try again later."
+msgstr "Service temporarily unavailable, try again later."
+
+msgid "Success"
+msgstr "Success"
+
+msgid "Token refreshed"
+msgstr "Token refreshed"
+
+msgid "Too many requests. Please try again in %(minutes)d minute(s)."
+msgstr "Too many requests. Please try again in %(minutes)d minute(s)."
+
+msgid "Too many requests. Please try again in %(seconds)d second(s)."
+msgstr "Too many requests. Please try again in %(seconds)d second(s)."
+
+msgid "Too many requests. Please try again later."
+msgstr "Too many requests. Please try again later."
+
 msgid "You do not have permission to perform this action"
 msgstr "You do not have permission to perform this action"
 
-msgid "Service temporarily unavailable, try again later"
-msgstr "Service temporarily unavailable, try again later"
+msgid "You do not have permission to perform this action."
+msgstr "You do not have permission to perform this action."
 
-msgid "Invalid data provided"
-msgstr "Invalid data provided"
+msgid "Your OTP for password reset is %(otp)s. It expires in %(minutes)d minutes."
+msgstr "Your OTP for password reset is %(otp)s. It expires in %(minutes)d minutes."
 
-msgid "Resource conflict"
-msgstr "Resource conflict"
-
-# Health
-msgid "healthy"
-msgstr "healthy"
-
-msgid "unhealthy"
-msgstr "unhealthy"
+msgid "alive"
+msgstr "alive"
 
 msgid "degraded"
 msgstr "degraded"
 
-msgid "ready"
-msgstr "ready"
+msgid "healthy"
+msgstr "healthy"
 
 msgid "not ready"
 msgstr "not ready"
 
-msgid "alive"
-msgstr "alive"
+msgid "ready"
+msgstr "ready"
+
+msgid "unhealthy"
+msgstr "unhealthy"

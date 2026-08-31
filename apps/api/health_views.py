@@ -9,6 +9,8 @@ from rest_framework.views import APIView
 
 from drf_spectacular.utils import extend_schema
 
+from libs.responses import error_response, success_response
+
 
 class HealthCheckView(APIView):
     """
@@ -52,7 +54,9 @@ class HealthCheckView(APIView):
         }
 
         status_code = status.HTTP_200_OK if (db_healthy and redis_healthy) else status.HTTP_503_SERVICE_UNAVAILABLE
-        return Response(health_data, status=status_code)
+        if status_code >= 400:
+            return error_response(message=_("Service degraded"), status=status_code)
+        return success_response(data=health_data, message=_("Service healthy"), status=status_code)
 
 
 class ReadyCheckView(APIView):
@@ -71,9 +75,9 @@ class ReadyCheckView(APIView):
     def get(self, request):
         try:
             connection.ensure_connection()
-            return Response({"status": _("ready")}, status=status.HTTP_200_OK)
+            return success_response(data={"status": _("ready")})
         except Exception:
-            return Response({"status": _("not ready")}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            return error_response(message=_("not ready"), status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 
 class LiveCheckView(APIView):
@@ -90,4 +94,4 @@ class LiveCheckView(APIView):
         responses={200: dict},
     )
     def get(self, request):
-        return Response({"status": _("alive")}, status=status.HTTP_200_OK)
+        return success_response(data={"status": _("alive")})

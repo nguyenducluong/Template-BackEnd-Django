@@ -1,8 +1,40 @@
+# BẢO MẬT & THÔNG TIN NHẠY CẢM
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.history/
+.vscode/
+
+# DEPENDENCIES (Thư mục thư viện nặng)
+node_modules/
+
+# BUILD & OUTPUT (Sản phẩm sau biên dịch, AI không cần đọc)
+dist/
+build/
+out/
+.next/
+.cache/
+.turbo/
+
+# LOGS & TESTS (Dữ liệu tạm thời)
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+coverage/
+.jest/
+
+# FILE HỆ ĐIỀU HÀNH
+.DS_Store
+Thumbs.db
+
 .env
 .gitignore
 .venv
-.vscode
 .docker
 logs
 venv
-**/*.mo
+**/*.moa
