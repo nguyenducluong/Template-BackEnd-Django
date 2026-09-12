@@ -1,6 +1,8 @@
 from django.utils.translation import gettext as _
 from rest_framework import serializers
 
+from .models import FAQ
+
 
 class AIChatMessageSerializer(serializers.Serializer):
     """One message in the conversation history sent to the AI."""
@@ -25,3 +27,11 @@ class AIChatRequestSerializer(serializers.Serializer):
                 _("The last message must have role 'user'.")
             )
         return value
+
+
+class FAQSerializer(serializers.ModelSerializer):
+    """Serializer cho FAQ — trả về danh sách câu thường hỏi."""
+
+    class Meta:
+        model = FAQ
+        fields = ["id", "category", "question", "answer", "sort_order"]

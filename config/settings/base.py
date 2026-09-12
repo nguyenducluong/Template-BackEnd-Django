@@ -48,6 +48,7 @@ LOCAL_APPS = [
     "apps.websocket",
     "apps.info",
     "apps.ai",
+    "apps.systems",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -282,7 +283,7 @@ CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=_build_redis_url(RE
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = "Asia/Bangkok"
+CELERY_TIMEZONE = "Asia/Ho_Chi_Minh"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60
 CELERY_BEAT_SCHEDULE = {}
@@ -307,7 +308,8 @@ REST_FRAMEWORK = {
         "user_write": env("THROTTLE_USER_WRITE", default="30/min"),
         "face": env("THROTTLE_FACE", default="20/min"),
         "core": env("THROTTLE_CORE", default="60/min"),
-        "ai": env("THROTTLE_AI", default="10/min"),
+        "ai": env("THROTTLE_AI", default="60/min"),
+        "systems": env("THROTTLE_SYSTEMS", default="120/min"),
         "default": env("THROTTLE_DEFAULT", default="100/min"),
     },
     "DEFAULT_PAGINATION_CLASS": "libs.pagination.StandardPagination",

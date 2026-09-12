@@ -38,10 +38,10 @@ def _user_serialize(user, include_knox=False) -> dict:
     return data
 
 
-def _user_by_id(user, args: dict) -> dict:
+def _user_by_fullname(user, args: dict) -> dict:
     from apps.accounts.models import User
 
-    row = User.objects.select_related("org", "shift").filter(id=args.get("user_id")).first()
+    row = User.objects.select_related("org", "shift").filter(full_name=args.get("full_name")).first()
     if row is None:
         return {"error": "Không tìm thấy user"}
     if not _can_view(user, row):
@@ -63,16 +63,16 @@ def _user_by_gen_id(user, args: dict) -> dict:
     return {"user": _user_serialize(row, include_knox=include_knox)}
 
 
-user_by_id_tool = ToolSpec(
-    name="user.get",
-    description="Tra cứu user theo id. Chỉ trả thông tin khi cùng org / chính mình / có quyền.",
+user_by_fullname_tool = ToolSpec(
+    name="user.get_by_full_name",
+    description="Tra cứu user theo họ và tên. Chỉ trả thông tin khi cùng org / chính mình / có quyền.",
     input_schema={
         "type": "object",
-        "properties": {"user_id": {"type": "integer"}},
-        "required": ["user_id"],
+        "properties": {"full_name": {"type": "string"}},
+        "required": ["full_name"],
         "additionalProperties": False,
     },
-    handler=_user_by_id,
+    handler=_user_by_fullname,
 )
 
 user_by_gen_id_tool = ToolSpec(

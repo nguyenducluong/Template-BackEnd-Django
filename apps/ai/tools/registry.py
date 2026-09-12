@@ -12,13 +12,13 @@ from .base import ToolSpec
 from .face_tools import face_search_tool
 from .info_tools import header_structure_tool, org_tree_tool, orgs_tool
 from .system_tools import system_health_tool
-from .user_tools import user_by_gen_id_tool, user_by_id_tool
+from .user_tools import user_by_gen_id_tool, user_by_fullname_tool
 
 TOOLS: Dict[str, ToolSpec] = {t.name: t for t in [
     header_structure_tool,
     orgs_tool,
     org_tree_tool,
-    user_by_id_tool,
+    user_by_fullname_tool,
     user_by_gen_id_tool,
     face_search_tool,
     system_health_tool,

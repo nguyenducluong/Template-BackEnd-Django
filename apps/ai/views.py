@@ -7,6 +7,9 @@ POST /api/v1/ai/chat/
         data: {"content": "<delta>"}      (many times)
         data: [DONE]                      (terminal frame)
 
+GET /api/v1/ai/faq/
+    Resp: standard JSON envelope — danh sách FAQ active, sort theo sort_order.
+
 Errors before streaming starts follow the standard JSON envelope
 (via the custom exception handler); errors discovered mid-stream are
 emitted as a final SSE error frame so the client can render them.
@@ -25,9 +28,11 @@ from django.utils.translation import gettext as _
 
 from libs.ai import AIServiceError, AIServiceTimeout, AIServiceUnavailable, OllamaClient
 from libs.auth.throttling import ScopedRateThrottle
+from libs.responses import success_response
 
 from .agent import ToolAgent
-from .serializers import AIChatRequestSerializer
+from .models import FAQ
+from .serializers import AIChatRequestSerializer, FAQSerializer
 
 logger = logging.getLogger("apps")
 
@@ -53,6 +58,27 @@ def _ollama_available() -> bool:
 
 def _sse(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+class FAQListView(APIView):
+    """GET /api/v1/ai/faq/ — danh sách câu thường hỏi (active only)."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "ai"
+    http_method_names = ["get", "options"]
+
+    @extend_schema(
+        tags=["AI"],
+        responses={200: FAQSerializer(many=True)},
+    )
+    def get(self, request):
+        faqs = FAQ.objects.filter(is_active=True)
+        serializer = FAQSerializer(faqs, many=True)
+        return success_response(
+            data=serializer.data,
+            message=_("Success"),
+        )
 
 
 class AIChatView(APIView):
