@@ -4,10 +4,15 @@ API versioning is done via URL path prefix (/api/v1/, /api/v2/).
 """
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
 
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+
+admin.site.site_header = "Django API Server — Administration"
+admin.site.site_title = "Django API Admin"
+admin.site.index_title = "Database Administration"
 
 
 def _api_envelope(status_code, message):
@@ -40,6 +45,9 @@ handler404 = "config.urls.api_page_not_found"
 handler500 = "config.urls.api_server_error"
 
 urlpatterns = [
+    # Django Admin (session auth riêng, không đụng JWT của API)
+    path("admin/", admin.site.urls),
+
     # API Documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),

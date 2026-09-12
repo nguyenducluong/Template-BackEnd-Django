@@ -26,6 +26,7 @@ from django.utils.translation import gettext as _
 from libs.ai import AIServiceError, AIServiceTimeout, AIServiceUnavailable, OllamaClient
 from libs.auth.throttling import ScopedRateThrottle
 
+from .agent import ToolAgent
 from .serializers import AIChatRequestSerializer
 
 logger = logging.getLogger("apps")
@@ -70,7 +71,38 @@ class AIChatView(APIView):
     def post(self, request):
         serializer = AIChatRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        messages = serializer.validated_data["messages"]
+        messages = [
+            {"role": m["role"], "content": m["content"]}
+            for m in serializer.validated_data["messages"]
+            if m["role"] != "tool"  # S4: client không được bịa role "tool" (giả kết quả tool)
+        ]
+        use_tools = serializer.validated_data.get("tools", True)
+        max_turns = serializer.validated_data.get("max_turns", 3)
+
+        if use_tools:
+            # Agent tool-calling: cần dữ liệu thì gọi tool (non-stream), rồi
+            # stream text cuối cùng. Giữ `tools: false` để dùng luồng cũ.
+            try:
+                agent = ToolAgent(client=_client, max_turns=max_turns)
+                final_text = agent.run(messages, user=request.user)
+            except AIServiceError as exc:
+                logger.exception("AI agent run failed")
+                from libs.responses import error_response
+
+                return error_response(
+                    message=str(exc), status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+            def agent_stream():
+                for i in range(0, len(final_text), 24):
+                    yield _sse({"content": final_text[i:i + 24]})
+                yield "data: [DONE]\n\n"
+
+            response = StreamingHttpResponse(
+                agent_stream(), content_type="text/event-stream")
+            response["Cache-Control"] = "no-cache"
+            response["X-Accel-Buffering"] = "no"
+            return response
 
         # Fail fast BEFORE starting the stream so the client receives a
         # normal 4xx/5xx envelope when the backend is down or times out.

@@ -99,10 +99,13 @@ class OllamaClient:
         return response.json().get("models", [])
 
     def chat(self, messages: List[Dict[str, str]], model: Optional[str] = None,
-             options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+             options: Optional[Dict[str, Any]] = None, tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
         """Non-streaming chat. Returns the full Ollama response
-        (``{"message": {"role", "content"}, "eval_count", ...}``)."""
-        payload = self._build_payload(messages, model, options, stream=False)
+        (``{"message": {"role", "content"}, "eval_count", ...}``).
+
+        *tools*: danh sách tool schema (native tool-calling cho model hỗ trợ).
+        """
+        payload = self._build_payload(messages, model, options, stream=False, tools=tools)
         response = self._post("/api/chat", payload, stream=False)
         self._raise_for_error(response)
         return response.json()
@@ -112,13 +115,14 @@ class OllamaClient:
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
+        tools: Optional[List[Dict]] = None,
     ) -> Generator[str, None, None]:
         """Streaming chat — yields delta text chunks as they arrive.
 
         Raises the same AIServiceError family as ``chat``; network failures
         mid-stream surface as AIServiceError too.
         """
-        payload = self._build_payload(messages, model, options, stream=True)
+        payload = self._build_payload(messages, model, options, stream=True, tools=tools)
         response = self._post("/api/chat", payload, stream=True)
         self._raise_for_error(response)
         try:
@@ -141,13 +145,16 @@ class OllamaClient:
         finally:
             response.close()
 
-    def _build_payload(self, messages, model, options, stream: bool) -> Dict[str, Any]:
+    def _build_payload(self, messages, model, options, stream: bool,
+                       tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
         payload = {
             "model": model or self.model,
             "messages": messages,
             "stream": stream,
             "keep_alive": self.keep_alive,
         }
+        if tools:
+            payload["tools"] = tools
         if options:
             payload["options"] = options
         return payload

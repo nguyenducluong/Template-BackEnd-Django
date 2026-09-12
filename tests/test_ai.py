@@ -65,8 +65,10 @@ class AIChatViewTests(SimpleTestCase):
         )
 
     def _post(self, payload):
+        # Mặc định tools=False để test luồng stream thuần (cũ); bật tools riêng cho agent tests.
+        body = {**payload, "tools": payload.get("tools", False)}
         request = self.factory.post(
-            "/api/v1/ai/chat/", payload, content_type="application/json"
+            "/api/v1/ai/chat/", body, content_type="application/json"
         )
         self.force_authenticate(request, user=self.user)
         return self.view(request)

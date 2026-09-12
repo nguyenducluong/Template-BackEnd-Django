@@ -24,6 +24,11 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
 
 # Application definition
 DJANGO_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
     "django.contrib.staticfiles",
 ]
 
@@ -50,7 +55,11 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
     "libs.middlewares.rate_limit.RateLimitMiddleware",
     "libs.middlewares.encryption.EncryptionMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -67,6 +76,8 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
@@ -136,6 +147,15 @@ DB_SCHEMAS = {
     "info.headerorganizationuserregistration": "info",
     "info.systempermission": "info",
     "info.usersystempermissionregistration": "info",
+    # ---- Framework tables (admin/auth/sessions) -> schema public ----
+    # Nếu không map, SchemaRouter trả "no opinion" trên các schema alias
+    # -> bảng auth/sessions bị NHÂN BẢN vào user/info/face_id schemas.
+    "auth.user": "public",
+    "auth.group": "public",
+    "auth.permission": "public",
+    "contenttypes.contenttype": "public",
+    "sessions.session": "public",
+    "admin.logentry": "public",
 }
 
 # Set tên schema (đã de-dupe, giữ thứ tự ổn định)
@@ -163,6 +183,8 @@ DATABASES["default"]["OPTIONS"] = {
 # để FK chéo giữa các schema resolve được.
 _base_db = DATABASES["default"]
 for _schema in _SCHEMA_ORDER:
+    if _schema == DB_DEFAULT_SCHEMA:
+        continue  # framework tables map về public = default connection
     _others = [s for s in _SCHEMA_ORDER if s != _schema]
     DATABASES[f"schema_{_schema}"] = {
         **_base_db,

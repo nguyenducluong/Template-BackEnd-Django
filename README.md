@@ -130,7 +130,8 @@ RESET_TOKEN_EXPIRY_SECONDS=600
 
 ```bash
 python manage.py makemigrations
-python manage.py migrate
+python manage.py migrate_schemas     # tạo schema + bảng đúng thứ tự FK
+python manage.py seed_data           # seed data đã có sẵn
 python manage.py createsuperuser
 ```
 
