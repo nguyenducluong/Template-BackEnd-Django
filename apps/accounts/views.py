@@ -15,10 +15,13 @@ from .serializers import (
     LoginSerializer,
     LogoutSerializer,
     RegisterSerializer,
+    RequiredOtpUnlockSerializer,
     ResetPasswordSerializer,
     TokenRefreshSerializer,
     UnlockSerializer,
     UserSerializer,
+    ValidateOtpUnlockSerializer,
+    build_user_info,
 )
 from libs.responses import created_response, error_response, success_response
 from libs.auth.jwt_utils import (
@@ -85,6 +88,10 @@ class LoginView(APIView):
                 "access": tokens["access"],
                 "refresh": tokens["refresh"],
                 "user": UserSerializer(user).data,
+                # Port từ Laravel: user_info (ipv4, status_label, org_full_name...)
+                # + auth_page điều hướng frontend (keyCheck=1 → bắt buộc đổi mật khẩu)
+                "user_info": build_user_info(request, user),
+                "auth_page": "change_password" if user.keyCheck == 1 else "user_info",
             },
             message=_("Login successful"),
         )
@@ -150,6 +157,9 @@ class RefreshTokenView(APIView):
                 "access": access,
                 "refresh": refresh,
                 "user": UserSerializer(user).data,
+                # Port từ Laravel: user_info + auth_page cho silent-refresh
+                "user_info": build_user_info(request, user),
+                "auth_page": "change_password" if user.keyCheck == 1 else "user_info",
             },
             message=_("Token refreshed"),
         )
@@ -237,6 +247,9 @@ class ChangePasswordView(APIView):
             data={
                 "detail": _("Password changed successfully"),
                 "keyCheck": user.keyCheck,
+                # Port từ Laravel: sau khi đổi mật khẩu → cấp user_info mới + vào hệ thống
+                "user_info": build_user_info(request, user),
+                "auth_page": "user_info",
             },
             message=_("Password changed successfully"),
         )
@@ -373,5 +386,113 @@ class ResetPasswordView(APIView):
         return success_response(
             data={"detail": _("Password reset successfully")},
             message=_("Password reset successfully"),
+        )
+
+
+# ---------------------------------------------------------------------------
+# OTP unlock — port từ Laravel RequiredOtpUnlockService / ValidateOtpUnlockService
+# (OTP 6 số, cache 180 giây; trả OTP trong response ở dev — TODO: gửi email)
+# ---------------------------------------------------------------------------
+
+OTP_UNLOCK_TTL = 180  # giây — khớp Laravel UserModel::CACHE_TIMEOUT
+
+
+@extend_schema(tags=["Authentication"])
+class RequiredOtpUnlockView(APIView):
+    """Yêu cầu OTP mở khóa tài khoản (body: { knox_id })."""
+
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth"
+    http_method_names = ["post", "options"]
+
+    @extend_schema(
+        request=RequiredOtpUnlockSerializer,
+        responses={
+            200: {
+                "type": "object",
+                "properties": {"otp": {"type": "string"}, "time": {"type": "integer"}},
+            },
+            400: dict,
+        },
+    )
+    def post(self, request):
+        serializer = RequiredOtpUnlockSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data["user"]
+
+        # Chỉ cho yêu cầu OTP khi tài khoản đang bị khóa (khớp Laravel: is_locked > 0)
+        if not user.is_account_locked():
+            return error_response(
+                message=_("Account is not locked."),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        import secrets
+
+        otp = str(secrets.randbelow(10 ** settings.OTP_LENGTH)).zfill(settings.OTP_LENGTH)
+        RedisService.store_otp(f"unlock:{user.id}", otp, ttl=OTP_UNLOCK_TTL)
+        # TODO: gửi OTP qua email (SMTP) — Laravel cũng đang TODO bước này
+
+        return success_response(
+            data={"otp": otp, "time": OTP_UNLOCK_TTL},
+            message=_("OTP sent. Please check your email."),
+        )
+
+
+@extend_schema(tags=["Authentication"])
+class ValidateOtpUnlockView(APIView):
+    """Xác minh OTP mở khóa tài khoản (body: { knox_id, use_otp })."""
+
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth"
+    http_method_names = ["post", "options"]
+
+    @extend_schema(
+        request=ValidateOtpUnlockSerializer,
+        responses={200: dict, 400: dict},
+    )
+    def post(self, request):
+        serializer = ValidateOtpUnlockSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data["user"]
+
+        # Tài khoản không bị khóa (khớp Laravel: auth_page sign_in + time 0)
+        if not user.is_account_locked():
+            return success_response(
+                data={"auth_page": "sign_in", "time": 0},
+                message=_("Account is not locked."),
+            )
+
+        identifier = f"unlock:{user.id}"
+        # LƯU Ý: RedisService.get() nhận KEY ĐẦY ĐỦ (otp:<id>), khác
+        # store_otp/delete_otp/verify_otp chỉ nhận identifier
+        cached_otp = RedisService.get(f"otp:{identifier}")
+        if cached_otp is None:
+            # OTP hết hạn / chưa yêu cầu (khớp Laravel: otp_expired)
+            return error_response(
+                message=_("OTP has expired. Please request a new one."),
+                errors={"otp": [_("OTP has expired. Please request a new one.")]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if cached_otp != serializer.validated_data["use_otp"]:
+            return error_response(
+                message=_("Invalid OTP."),
+                errors={"otp": [_("Invalid OTP.")]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Đúng OTP → xóa OTP + reset lockout (khớp Laravel: is_locked = 0)
+        RedisService.delete_otp(identifier)
+        user.reset_failed_login()
+        return success_response(
+            data={
+                "auth_page": "sign_in",
+                "user_info": build_user_info(request, user),
+            },
+            message=_("Account unlocked successfully."),
         )
 

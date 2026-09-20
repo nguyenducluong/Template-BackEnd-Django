@@ -139,3 +139,38 @@ def decrypt_payload(aes_key: bytes, payload_b64: str, nonce_b64: str) -> bytes:
         return AESGCM(aes_key).decrypt(nonce, ct, None)
     except Exception as exc:
         raise CryptoError("Invalid encrypted payload") from exc
+
+
+# ---------------------------------------------------------------------------
+# Hybrid payload (RSA-OAEP wrapped AES key + AES-256-GCM ciphertext)
+# Wire format: {"payload": "<b64 ct>", "nonce": "<b64>", "key": "<b64 wrapped>"}
+# Dùng cho REQUEST (wrap bằng server public key) và RESPONSE (wrap bằng client
+# public key) — mỗi request/response có AES key riêng.
+# ---------------------------------------------------------------------------
+
+def pack_hybrid_payload(aes_key: bytes, plaintext: bytes, public_key) -> dict:
+    """Encrypt *plaintext* with a fresh-random AES-256-GCM and wrap the AES key
+    with *public_key* (RSA-OAEP) → dict sẵn sàng trả về client."""
+    payload_b64, nonce_b64 = encrypt_payload(aes_key, plaintext)
+    return {
+        "payload": payload_b64,
+        "nonce": nonce_b64,
+        "key": rsa_wrap_key(public_key, aes_key),
+    }
+
+
+def unpack_hybrid_payload(body: dict) -> bytes:
+    """Decrypt a hybrid payload whose AES key is wrapped with the SERVER
+    public key (stateless request mode — không cần session).
+
+    Raises CryptoError when the payload is malformed or the key cannot be unwrapped.
+    """
+    if not isinstance(body, dict):
+        raise CryptoError("Hybrid payload must be an object")
+    wrapped_key = body.get("key")
+    payload_b64 = body.get("payload")
+    nonce_b64 = body.get("nonce")
+    if not wrapped_key or not payload_b64 or not nonce_b64:
+        raise CryptoError("Hybrid payload requires 'key', 'payload' and 'nonce'")
+    aes_key = rsa_unwrap_key(str(wrapped_key))
+    return decrypt_payload(aes_key, str(payload_b64), str(nonce_b64))

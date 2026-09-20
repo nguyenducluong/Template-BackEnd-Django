@@ -257,3 +257,81 @@ class ResetPasswordSerializer(serializers.Serializer):
         attrs["user"] = user
         return attrs
 
+
+# ---------------------------------------------------------------------------
+# Helpers port từ Laravel (shape `user_info` khớp UserModel::getUserInfo)
+# ---------------------------------------------------------------------------
+
+# Nhãn trạng thái theo ngôn ngữ — port từ Laravel UserModel::STATUS_USER
+# (dùng dict thay gettext để hành vi khớp 1-1 với Laravel, không phụ thuộc .mo)
+STATUS_LABELS = {
+    0: {"vi": "Chờ phê duyệt", "en": "Waiting for approval", "kr": "승인 대기 중"},
+    1: {"vi": "Đã phê duyệt", "en": "Approved", "kr": "승인됨"},
+    2: {"vi": "Bị từ chối", "en": "Rejected", "kr": "거부됨"},
+    3: {"vi": "Bị khóa", "en": "Blocked", "kr": "차단됨"},
+    4: {"vi": "Đã xóa", "en": "Deleted", "kr": "삭제됨"},
+}
+
+
+def get_client_ip(request) -> str:
+    """IP client (tôn trọng X-Forwarded-For khi có proxy)."""
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "")
+
+
+def build_user_info(request, user) -> dict:
+    """Dựng object `user_info` trả về frontend — shape khớp Laravel."""
+    language = getattr(request, "LANGUAGE_CODE", None) or "vi"
+    labels = STATUS_LABELS.get(user.status) or {}
+    return {
+        "gen_id": user.gen_id,
+        "knox_id": user.knox_id,
+        "full_name": user.full_name,
+        "status": user.status,
+        "org_id": user.org_id,
+        "org_full_name": user.org.name if user.org_id and user.org else "",
+        "shift_id": user.shift_id,
+        "change_pw_at": (
+            user.change_pw_at.strftime("%Y-%m-%d %H:%M:%S")
+            if user.change_pw_at
+            else None
+        ),
+        "ipv4": get_client_ip(request),
+        "status_label": labels.get(language) or labels.get("vi") or "",
+    }
+
+
+class RequiredOtpUnlockSerializer(serializers.Serializer):
+    """Yêu cầu OTP mở khóa tài khoản (body: { knox_id })."""
+
+    knox_id = serializers.CharField()
+
+    def validate(self, attrs):
+        try:
+            user = User.objects.get(knox_id=attrs["knox_id"])
+        except (User.DoesNotExist, User.MultipleObjectsReturned):
+            raise serializers.ValidationError(
+                _("No account found with this Knox ID.")
+            )
+        attrs["user"] = user
+        return attrs
+
+
+class ValidateOtpUnlockSerializer(serializers.Serializer):
+    """Xác minh OTP mở khóa (body: { knox_id, use_otp })."""
+
+    knox_id = serializers.CharField()
+    use_otp = serializers.CharField(min_length=4, max_length=10)
+
+    def validate(self, attrs):
+        try:
+            user = User.objects.get(knox_id=attrs["knox_id"])
+        except (User.DoesNotExist, User.MultipleObjectsReturned):
+            raise serializers.ValidationError(
+                _("No account found with this Knox ID.")
+            )
+        attrs["user"] = user
+        return attrs
+

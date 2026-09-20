@@ -45,7 +45,20 @@ def _mock_rows(header, params, total=120):
 # Các func mặc định — mỗi hệ thống override trong views.py khi cần
 # ---------------------------------------------------------------------------
 def definition(request, header, params=None):
-    """Schema cấu hình UI: search fields, columns, actions, charts."""
+    """Schema cấu hình UI của UI Engine — đúng contract Schema/Runtime.
+
+    schema.search.viewSelector : { enabled, default, options } — cấu hình nút
+        chuyển Details/Chart trên toolbar; runtime.viewMode khởi tạo từ `default`.
+    schema.search.org          : { label, type, options } — bộ lọc đơn vị;
+        giá trị lưu runtime.search.org.selected (array khi type='multi').
+    schema.search.date         : { label, type: 'range'|'single' } — bộ lọc ngày;
+        giá trị lưu runtime.search.date { type, from, to }.
+    schema.search.options      : { fields: [...] } — các trường tìm kiếm động,
+        render qua fieldRegistry; giá trị lưu runtime.search.options[field].
+    schema.details             : columns / actions / pageSizeOptions.
+    schema.chart.charts        : danh sách biểu đồ { chart_id, title, chart_type, span? }.
+    schema.history.enabled     : ẩn/hiện cột WindowManager bên phải.
+    """
     return success_response(
         data={
             "system": {
@@ -58,14 +71,44 @@ def definition(request, header, params=None):
                 "is_mobile": header.is_mobile,
             },
             "search": {
-                "fields": [
-                    {"field": "code", "label": _("Code"), "field_type": "text"},
-                    {"field": "date", "label": _("Date"), "field_type": "date"},
-                ],
+                "viewSelector": {
+                    "enabled": True,
+                    "default": "details",
+                    "options": [
+                        {"value": "details", "label": _("Details")},
+                        {"value": "chart", "label": _("Chart")},
+                    ],
+                },
+                "org": {
+                    "label": _("Org"),
+                    "type": "multi",
+                    "options": [
+                        {"value": "ORG-01", "label": "ORG-01"},
+                        {"value": "ORG-02", "label": "ORG-02"},
+                    ],
+                },
+                "date": {
+                    "label": _("Date"),
+                    "type": "range",
+                },
+                "options": {
+                    "fields": [
+                        {"field": "code", "label": _("Code"), "field_type": "text"},
+                        {
+                            "field": "status",
+                            "label": _("Status"),
+                            "field_type": "select",
+                            "options": [
+                                {"value": "PASS", "label": "PASS"},
+                                {"value": "FAIL", "label": "FAIL"},
+                            ],
+                        },
+                    ],
+                },
             },
             "details": {
                 "columns": [
-                    {"field": "code", "label": _("Code"), "renderer": "text"},
+                    {"field": "code", "label": _("Code"), "renderer": "text", "sortable": True},
                     {"field": "name", "label": _("Name"), "renderer": "text"},
                     {"field": "status", "label": _("Status"), "renderer": "status"},
                     {"field": "date", "label": _("Date"), "renderer": "date"},
@@ -75,12 +118,16 @@ def definition(request, header, params=None):
                     {"action_id": "view_detail", "label": _("Detail")},
                     {"action_id": "edit_record", "label": _("Edit")},
                 ],
+                "pageSizeOptions": [20, 50, 100],
             },
-            "charts": {
+            "chart": {
                 "charts": [
                     {"chart_id": "pass_fail_ratio", "title": _("Pass/Fail Ratio"), "chart_type": "pie"},
                     {"chart_id": "daily_trend", "title": _("Daily Trend"), "chart_type": "line"},
                 ],
+            },
+            "history": {
+                "enabled": True,
             },
         },
         message=_("System definition loaded"),

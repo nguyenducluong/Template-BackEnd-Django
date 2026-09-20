@@ -77,3 +77,15 @@ def get_session_aes_key(session_id: str, ttl: int | None = None) -> bytes | None
 
 def delete_session(session_id: str) -> None:
     cache.delete(_key(session_id))
+
+
+def get_session_client_public_key(session_id: str, ttl: int | None = None) -> str | None:
+    """Return the CLIENT RSA public key PEM of a session (None if expired/unknown).
+
+    Dùng cho chiều RESPONSE: server wrap AES key mới của từng response bằng
+    public key này, client unwrap bằng private key của chính nó.
+    """
+    session = get_session(session_id, ttl)
+    if session is None:
+        return None
+    return session.get("client_public_key")

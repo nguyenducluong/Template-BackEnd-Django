@@ -200,9 +200,13 @@ DATABASE_ROUTERS = ["libs.db_routers.SchemaRouter"]
 
 # ---------------------------------------------------------------------------
 # API Payload Encryption (RSA-OAEP handshake + AES-256-GCM session)
-# Disabled entirely when DJANGO_ENV == "development"
+# Mặc định: ON khi DJANGO_ENV != "development" — có thể override bằng
+# biến môi trường ENABLE_API_ENCRYPTION=True/False (xem .env.example)
 # ---------------------------------------------------------------------------
-ENABLE_API_ENCRYPTION = env("DJANGO_ENV", default="development") != "development"
+ENABLE_API_ENCRYPTION = env.bool(
+    "ENABLE_API_ENCRYPTION",
+    default=env("DJANGO_ENV", default="development") != "development",
+)
 RSA_PRIVATE_KEY_PATH = env("RSA_PRIVATE_KEY_PATH", default="certs/private_key.pem")
 RSA_PUBLIC_KEY_PATH = env("RSA_PUBLIC_KEY_PATH", default="certs/public_key.pem")
 CRYPTO_SESSION_TTL = env.int("CRYPTO_SESSION_TTL", default=3600)  # seconds
@@ -220,7 +224,9 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = env.int("DATA_UPLOAD_MAX_NUMBER_FIELDS", default
 ENCRYPTION_EXCLUDED_PREFIXES = [
     "/admin",
     "/api/v1/health",
-    "/api/v1/crypto",
+    # LƯU Ý: KHÔNG loại trừ /api/v1/crypto — handshake phải được mã hóa request
+    # bằng server public key (middleware tự bỏ qua request plaintext như
+    # GET /crypto/public_key vì content-type không phải encrypted+json).
     "/static",
     "/media",
     "/api/schema",
@@ -375,6 +381,10 @@ ACCOUNT_LOCKOUT_MINUTES = env.int("ACCOUNT_LOCKOUT_MINUTES", default=15)
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:3000"])
+
+# URL convention: KHÔNG trailing slash cho API (frontend gọi /api/v1/... không có "/" cuối).
+# Lưu ý: /admin, /api/docs, /api/schema phải gõ đúng có "/" (CommonMiddleware không còn tự redirect)
+APPEND_SLASH = False
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     "GET", "POST", "OPTIONS",
