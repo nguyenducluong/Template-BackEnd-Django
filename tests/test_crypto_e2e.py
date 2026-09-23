@@ -170,7 +170,7 @@ class CryptoRequestEncryptionTests(TestCase):
         body = pack_for(self.server_pub_pem, json.dumps({"lang": "vi"}).encode())
         response = self.client.generic(
             "GET",
-            f"{API}/define/options_authentication",
+            f"{API}/system/default/options_authentication",
             data=json.dumps(body),
             content_type=ENCRYPTED_CONTENT_TYPE,
             HTTP_X_SESSION_ID=session_id,
@@ -201,7 +201,7 @@ class CryptoRequestEncryptionTests(TestCase):
     # -- (5) tương thích ngược: request plaintext → response plaintext -------
     @override_settings(ENABLE_API_ENCRYPTION=True)
     def test_plaintext_request_stays_plaintext(self):
-        response = self.client.get(f"{API}/define/options_authentication")
+        response = self.client.get(f"{API}/system/default/options_authentication")
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response["Content-Type"].startswith(ENCRYPTED_CONTENT_TYPE))
         self.assertTrue(response.json()["success"])
@@ -237,7 +237,7 @@ class CryptoRequestEncryptionTests(TestCase):
         body = pack_for(self.server_pub_pem, json.dumps({"lang": "vi"}).encode())
         response = self.client.generic(
             "GET",
-            f"{API}/define/options_authentication",
+            f"{API}/system/default/options_authentication",
             data=json.dumps(body),
             content_type=ENCRYPTED_CONTENT_TYPE,
         )
@@ -251,7 +251,7 @@ class CryptoRequestEncryptionTests(TestCase):
         body = pack_with_session_key(session_key, json.dumps({"lang": "vi"}).encode())
         response = self.client.generic(
             "GET",
-            f"{API}/define/options_authentication",
+            f"{API}/system/default/options_authentication",
             data=json.dumps(body),
             content_type=ENCRYPTED_CONTENT_TYPE,
             HTTP_X_SESSION_ID=session_id,

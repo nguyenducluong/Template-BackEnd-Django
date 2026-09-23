@@ -31,9 +31,6 @@ from apps.info.models import SystemHeader
 from libs.auth.throttling import ScopedRateThrottle
 from libs.responses import error_response
 
-logger = logging.getLogger("apps")
-
-
 class SystemDispatchView(APIView):
     """POST /api/v1/systems/ — điều phối theo {header_id, func} trong body."""
 
@@ -94,7 +91,6 @@ class SystemDispatchView(APIView):
         try:
             module = importlib.import_module(module_path)
         except ModuleNotFoundError:
-            logger.warning("System module not found: %s", module_path)
             return error_response(
                 message=_("System module not implemented for this header."),
                 status=status.HTTP_404_NOT_FOUND,
@@ -112,7 +108,6 @@ class SystemDispatchView(APIView):
         try:
             return handler(request, header=header, params=params)
         except Exception:
-            logger.exception("System dispatch failed: header_id=%s func=%s", header.id, func)
             return error_response(
                 message=_("System function execution failed."),
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -17,6 +17,7 @@ Chữ ký chuẩn của mọi func trong views.py:
 from django.utils.translation import gettext as _
 
 from libs.responses import error_response, success_response
+from apps.systems.systems_details.translations import translate_payload
 
 
 # ---------------------------------------------------------------------------
@@ -200,3 +201,79 @@ def dashboard(request, header, params=None):
         },
         message=_("Dashboard loaded"),
     )
+
+
+# ---------------------------------------------------------------------------
+# Details view — dữ liệu blueprint {config, data, initial_state} theo header
+# ---------------------------------------------------------------------------
+def _load_details_payload(header):
+    """Import ``payload.DETAILS`` của systems_details/{header_id}/. Trả None nếu chưa có."""
+    import importlib
+
+    try:
+        module = importlib.import_module(f"apps.systems.systems_details.{header.id}.payload")
+    except ModuleNotFoundError:
+        return None
+    return module.DETAILS
+
+
+def _build_history(payload):
+    """Sinh history entry mặc định đúng shape frontend (HistoryApp/ModalDragable)."""
+    dialogs = ((payload or {}).get("config") or {}).get("dialogs") or {}
+    active_id = (((payload or {}).get("initial_state") or {}).get("current") or {}).get("active_dialog_id")
+    label = (dialogs.get(active_id) or {}).get("header", {}).get("label") or active_id
+    return [{"label": label, "color": "success", "is_active": True, "dialog_id": active_id, "row": [], "data": {}}]
+
+
+def details(request, header, params=None):
+    """Dữ liệu view chi tiết theo header — đọc từ payload.py riêng của từng hệ thống.
+
+    params.scope:
+        - 'full' : trả phẳng { config, initial_state, search, table, total_rows, history }
+                   — dùng khi mới mở header (hydrates config + defaults + data).
+        - 'data' (mặc định): { search, table, total_rows, history } — dùng cho search.
+
+    params.query: {org, period, limit, offset, details} — áp phân trang cho bảng
+    ``table_data`` và tính total_rows; các bảng KPI/grouped trả full (mock-safe).
+
+    Cả 2 scope đều trả CÁC KEY PHẲNG như nhau (table/search/total_rows/history nằm
+    trực tiếp trong data) để contract đồng nhất với detailsSlice.fulfilled.
+
+    Multilanguage: payload được deepcopy + dịch theo request.LANGUAGE_CODE
+    (Accept-Language từ frontend) bằng translations riêng của systems_details
+    (KHÔNG dùng gettext locale) — trả client đã dịch, không bẩn module dict.
+    """
+    payload = _load_details_payload(header)
+    if payload is None:
+        return error_response(
+            message=_("Details payload not implemented for this header."),
+            status=404,
+        )
+
+    scope = (params or {}).get("scope") or "data"
+    query = (params or {}).get("query") or {}
+    lang = getattr(request, "LANGUAGE_CODE", None) or "vi"
+
+    # ---- Chuẩn bị data phẳng dùng chung cho cả 2 scope (deepcopy — không bẩn module dict) ----
+    import copy
+
+    data = copy.deepcopy(payload["data"])
+    table = data.setdefault("table", {})
+    rows = table.get("table_data") or []
+    limit = int(query.get("limit") or 50)
+    offset = int(query.get("offset") or 0)
+    table["table_data"] = rows[offset : offset + limit]
+    data["total_rows"] = len(rows)
+    data["history"] = _build_history(payload)
+
+    if scope == "full":
+        # Thêm config blueprint + initial_state (defaults/current) cho lần đầu mở header
+        data["config"] = copy.deepcopy(payload["config"])
+        data["initial_state"] = copy.deepcopy(payload["initial_state"])
+        message = _("Details loaded")
+    else:
+        message = _("Details data loaded")
+
+    # Multilanguage riêng của systems_details — dịch marker "@key" theo lang
+    data = translate_payload(data, lang, header.id)
+    return success_response(data=data, message=message)

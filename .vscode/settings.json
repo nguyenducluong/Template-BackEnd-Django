@@ -1,33 +1,33 @@
 {
-	"editor.formatOnSave": true,
+	"editor.formatOnSave": false,
 	"editor.defaultFormatter": "esbenp.prettier-vscode",
-  
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
-  "python.analysis.extraPaths": ["./"],
-  // Ẩn folder __pycache__ khỏi File Explorer (vẫn tồn tại trên disk, chỉ ẩn trong VS Code)
-  "files.exclude": {
-    "**/__pycache__": true,
-    "**/*.pyc": true,
-    ".venv": true,
-    "**/__init__.py": true,
-		"public": true,
-		"node_modules": true
-  },
-  // Không search/index vào __pycache__
-  "search.exclude": {
-    "**/__pycache__": true,
-    "**/*.pyc": true,
-    ".venv": true,
-    "**/__init__.py": true,
-		"public": true,
-		"node_modules": true
-  },
-  "files.watcherExclude": {
-    "**/__pycache__": true,
-    "**/*.pyc": true,
-    ".venv": true,
-    "**/__init__.py": true,
-		"public": true,
-		"node_modules": true
-  }
+
+	"python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+	"python.analysis.extraPaths": ["./"],
+	// Ẩn folder __pycache__ khỏi File Explorer (vẫn tồn tại trên disk, chỉ ẩn trong VS Code)
+	"files.exclude": {
+		"**/__pycache__": false,
+		"**/*.pyc": false,
+		".venv": false,
+		"**/__init__.py": false,
+		"public": false,
+		"node_modules": false
+	},
+	// Không search/index vào __pycache__
+	"search.exclude": {
+		"**/__pycache__": false,
+		"**/*.pyc": false,
+		".venv": false,
+		"**/__init__.py": false,
+		"public": false,
+		"node_modules": false
+	},
+	"files.watcherExclude": {
+		"**/__pycache__": false,
+		"**/*.pyc": false,
+		".venv": false,
+		"**/__init__.py": false,
+		"public": false,
+		"node_modules": false
+	}
 }

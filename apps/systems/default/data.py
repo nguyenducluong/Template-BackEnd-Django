@@ -1,7 +1,7 @@
 """
 Nhãn UI trang Auth (vi/en/kr) — port từ Laravel ``app/Views/DefineAppView.php``.
 
-Endpoint consumer: GET /api/v1/define/options_authentication/ (apps/api/define_views.py)
+Endpoint consumer: GET /api/v1/system/default/options_authentication (apps/systems/default/views.py)
 Chọn ngôn ngữ theo ``Accept-Language`` (LanguageMiddleware đã chuẩn hóa về vi/en/kr).
 """
 
