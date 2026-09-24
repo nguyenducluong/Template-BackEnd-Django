@@ -17,7 +17,7 @@ Shape trả về giữ đúng Laravel để frontend STD parse không đổi:
             {
                 "page_id": 10, "page_sort": 1, "page_name": "Kiểm tra",
                 "page_headers": [
-                    {"header_id": 100, "header_sort": 1, "header_view": "view_kcs_in", "header_name": "KCS Đầu vào"}
+                    {"header_id": 10000, "header_sort": 1, "header_view": "view_kcs_in", "header_name": "KCS Đầu vào"}
                 ],
             }
         ],
@@ -84,7 +84,15 @@ def get_registered_structure(user, language: str) -> list:
 					"page_id": page.id,
 					"page_sort": page.sort,
 					"page_name": getattr(page, f"page_{lang}"),
-					"page_headers": page_headers,
+					"page_headers": [
+						{
+							"header_id": 10000,
+							"header_sort": 0,
+							"header_view": 'Init System',
+							"header_name": 'Init System',
+						},
+						*page_headers
+					],
 				}
 			)
 		if not group_pages:

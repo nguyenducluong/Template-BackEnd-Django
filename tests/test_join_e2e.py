@@ -117,6 +117,8 @@ class EncryptedClient:
 class JoinedOrgShiftE2ETests(TestCase):
     """login / me / refresh — dữ liệu Organization + Shift join, qua kênh mã hóa."""
 
+    databases = "__all__"
+
     def setUp(self):
         cache.clear()
         # Cây tổ chức 4 cấp: Location(3) → Part(2) → Group(1) → Team(0)

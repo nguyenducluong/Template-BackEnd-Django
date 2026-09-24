@@ -12,6 +12,7 @@ from rest_framework import permissions, status
 from rest_framework.views import APIView
 
 from apps.info.models import SystemHeader
+from apps.info.permissions import HasHeaderPermission
 from apps.systems.systems_details.base_system import (  # noqa: F401
 	action,
 	chart,
@@ -20,6 +21,7 @@ from apps.systems.systems_details.base_system import (  # noqa: F401
 	details,
 	download,
 	search,
+	submit_form,
 )
 from .serializers import Header3DetailsRequestSerializer
 from libs.auth.throttling import ScopedRateThrottle
@@ -31,9 +33,11 @@ logger = logging.getLogger("apps")
 
 
 class Header3DetailsView(APIView):
-	"""POST /api/v1/systems/details/1 — dữ liệu view chi tiết của Header 1."""
+	"""POST /api/v1/systems/details/3 — dữ liệu view chi tiết của Header 3."""
 
-	permission_classes = [permissions.IsAuthenticated]
+	# Header mà endpoint này bảo vệ — HasHeaderPermission đọc attr này (quyền T1).
+	header_id = 3
+	permission_classes = [permissions.IsAuthenticated, HasHeaderPermission]
 	throttle_classes = [ScopedRateThrottle]
 	throttle_scope = "systems"
 	http_method_names = ["post", "options"]

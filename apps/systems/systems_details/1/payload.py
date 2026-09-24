@@ -9,6 +9,17 @@ HEADER_ID = 1
 
 DETAILS = {
 	"config": {
+		# Giá trị mặc định cho FE — FE đọc từ response `init_data` (không hardcode):
+		# endpoint của dispatcher `apps.systems.views.SystemDispatchView` + tên func.
+		"defaults": {
+			"endpoint": "systems/init_data",
+			"funcs": {
+				"details": "details",
+				"search": "search",
+				"submit": "submit_form",
+				"action": "action",
+			},
+		},
 		"search": {
 			"labels": {
 				"org": "@search.labels.org",
@@ -54,8 +65,8 @@ DETAILS = {
 							{"col_w": 320, "key": "col7", "level": 3},
 						],
 						"headers": [
-							{"title": "STT"}, {"title": "Tiêu đề Cột 1"}, {"title": "Tiêu đề Cột 2"}, {"title": "Tiêu đề Cột 3"},
-							{"title": "Tiêu đề Cột 4"}, {"title": "Tiêu đề Cột 5"}, {"title": "Tiêu đề Cột 6"}, {"title": "Tiêu đề Cột 7"},
+							{"title": "@table.headers.stt"}, {"title": "@table.kpi.headers.col1"}, {"title": "@table.kpi.headers.col2"}, {"title": "@table.kpi.headers.col3"},
+							{"title": "@table.kpi.headers.col4"}, {"title": "@table.kpi.headers.col5"}, {"title": "@table.kpi.headers.col6"}, {"title": "@table.kpi.headers.col7"},
 						],
 						"hierarchyKeys": ["subGroups", "details"],
 					},
@@ -66,7 +77,7 @@ DETAILS = {
 					"title": "@table.layout.grouped.title",
 					"data_key": "defect_overall",
 					"config": {
-						"tabs": ["Lot Reject Rate", "Sample Defect Rate"],
+						"tabs": ["@table.grouped.tabs.0", "@table.grouped.tabs.1"],
 						"activeTab": 0,
 						"col_keys": [
 							{"col_w": 80, "key": "gbm"},
@@ -83,9 +94,9 @@ DETAILS = {
 							{"col_w": 60, "key": ["details", "yearly"]},
 						],
 						"headers": [
-							{"title": "GBM", "key": "gbm", "col_span": ["details"], "vertical_align": "top", "is_bold": True},
-							{"title": "Plant", "key": "plant", "col_span": ["details"], "vertical_align": "top", "is_bold": True},
-							{"title": "Type", "key": ["details", "type"]},
+							{"title": "@table.grouped.headers.gbm", "key": "gbm", "col_span": ["details"], "vertical_align": "top", "is_bold": True},
+							{"title": "@table.grouped.headers.plant", "key": "plant", "col_span": ["details"], "vertical_align": "top", "is_bold": True},
+							{"title": "@table.grouped.headers.type", "key": ["details", "type"]},
 							{"title": "2024", "key": ["details", "v2024"]},
 							{"title": "2025", "key": ["details", "v2025"]},
 							{"title": "2026", "key": ["details", "v2026"]},
@@ -93,8 +104,8 @@ DETAILS = {
 							{"title": "2025-11", "key": ["details", "v11"]},
 							{"title": "2025-12", "key": ["details", "v12"]},
 							{"title": "2026-01", "key": ["details", "v01"]},
-							{"title": "Monthly", "key": ["details", "monthly"]},
-							{"title": "Yearly", "key": ["details", "yearly"]},
+							{"title": "@table.grouped.headers.monthly", "key": ["details", "monthly"]},
+							{"title": "@table.grouped.headers.yearly", "key": ["details", "yearly"]},
 						],
 					},
 				},
@@ -117,19 +128,19 @@ DETAILS = {
 						],
 						"headers": [
 							[
-								{"label": "STT", "row_span": 2},
-								{"label": "Thông tin nhân viên", "col_span": 4},
-								{"label": "Trạng thái", "col_span": 4},
+								{"label": "@table.headers.stt", "row_span": 2},
+								{"label": "@table.data.headers.group_employee", "col_span": 4},
+								{"label": "@table.data.headers.group_status", "col_span": 4},
 							],
 							[
-								{"label": "First Name", "row_span": 1},
-								{"label": "Last Name", "row_span": 1},
-								{"label": "Age", "row_span": 1},
-								{"label": "Phone Number", "row_span": 1},
-								{"label": "State 1", "row_span": 1},
-								{"label": "State 2", "row_span": 1},
-								{"label": "State 3", "row_span": 1},
-								{"label": "State 4"},
+								{"label": "@table.data.headers.first_name", "row_span": 1},
+								{"label": "@table.data.headers.last_name", "row_span": 1},
+								{"label": "@table.data.headers.age", "row_span": 1},
+								{"label": "@table.data.headers.phone", "row_span": 1},
+								{"label": "@table.data.headers.state1", "row_span": 1},
+								{"label": "@table.data.headers.state2", "row_span": 1},
+								{"label": "@table.data.headers.state3", "row_span": 1},
+								{"label": "@table.data.headers.state4"},
 							],
 						],
 					},
@@ -174,12 +185,30 @@ DETAILS = {
 					},
 				],
 				"actions": [
-					{"label": "@dialog.dlg_input_system.actions.0.label", "type": "cancel", "action": "CLOSE_DIALOG", "style": "secondary"},
+					{
+						"label": "@dialog.dlg_input_system.actions.0.label",
+						"type": "cancel",
+						"action": "CLOSE_DIALOG",
+						"style": "secondary",
+					},
 					{
 						"label": "@dialog.dlg_input_system.actions.1.label",
 						"type": "save",
 						"action": "SUBMIT_FORM",
 						"style": "primary",
+						# ---- Contract gọi API (FE đọc từ response init_data) ----
+						"url": "systems/init_data",
+						"method": "POST",
+						"func": "submit_form",
+						"action_id": "dlg_input_system.save",
+						# SystemPower.id — BE kiểm tra quyền theo nút (P1.6)
+						"power_key": 1,
+						# Giá trị mặc định nạp vào form khi mở dialog
+						"defaults": {},
+						# Field bắt buộc: FE chặn trước, BE validate lại (không tin client)
+						"validate": {"required": []},
+						# Hành vi sau khi submit thành công
+						"on_success": {"refresh": "data", "close_dialog": True, "remove_history": True},
 						"confirmation": {
 							"title": "@dialog.dlg_input_system.actions.1.confirmation.title",
 							"message": "@dialog.dlg_input_system.actions.1.confirmation.message",
@@ -225,8 +254,8 @@ DETAILS = {
 				},
 			],
 			"period_options": [
-				{"key": "created_at", "label": "Ngày tạo"},
-				{"key": "updated_at", "label": "Ngày cập nhật"},
+				{"key": "created_at", "label": "@search.period_options.created_at.label"},
+				{"key": "updated_at", "label": "@search.period_options.updated_at.label"},
 			],
 			"field_options": {
 				"multi_status": [
@@ -239,29 +268,29 @@ DETAILS = {
 					{"value": "7", "title": "Pulp Fiction", "year": 1994},
 				],
 				"status": [
-					{"value": "", "title": "Tất cả trạng thái"},
-					{"value": "approval", "title": "Đã được phê duyệt"},
+					{"value": "", "title": "@search.field_options.status.all"},
+					{"value": "approval", "title": "@search.field_options.status.approval"},
 				],
 				"key_shift": [
-					{"value": 1, "title": "Hành chính"},
-					{"value": 2, "title": "Shift 1A1"},
-					{"value": 3, "title": "Shift 2A1"},
-					{"value": 4, "title": "Shift 2A1"},
+					{"value": 1, "title": "@search.field_options.key_shift.1"},
+					{"value": 2, "title": "@search.field_options.key_shift.2"},
+					{"value": 3, "title": "@search.field_options.key_shift.3"},
+					{"value": 4, "title": "@search.field_options.key_shift.4"},
 				],
 				"gender": [
-					{"value": 1, "title": "Nam"},
-					{"value": 2, "title": "Nữ"},
-					{"value": 3, "title": "Khác"},
+					{"value": 1, "title": "@search.field_options.gender.1"},
+					{"value": 2, "title": "@search.field_options.gender.2"},
+					{"value": 3, "title": "@search.field_options.gender.3"},
 				],
 			},
 		},
 		"table": {
 			"kpi_summary": [
-				{"label": "Incoming Lot", "value": 12.691, "trend": None},
-				{"label": "Inspection Lot", "value": 1.223, "trend": None},
-				{"label": "Pass", "value": 12.672, "color": "success.main"},
-				{"label": "Fail", "value": 19, "color": "error.main"},
-				{"label": "Lot Reject Rate", "value": "1.55%", "trend": "down"},
+				{"label": "@table.kpi_summary.incoming_lot", "value": 12.691, "trend": None},
+				{"label": "@table.kpi_summary.inspection_lot", "value": 1.223, "trend": None},
+				{"label": "@table.kpi_summary.pass", "value": 12.672, "color": "success.main"},
+				{"label": "@table.kpi_summary.fail", "value": 19, "color": "error.main"},
+				{"label": "@table.kpi_summary.lot_reject_rate", "value": "1.55%", "trend": "down"},
 			],
 			# ═══ kpi_table_data → layout type: table_kpi (row → subGroups[] → details[]) ═══
 			"kpi_table_data": [
@@ -405,7 +434,9 @@ DETAILS = {
 			},
 			"org_slide": ["1.", "1.1.", "1.1.1.", "1.1.1.2."],
 			"confirmation": None,
-			"active_dialog_id": "dlg_input_system",
+			# None — dialog chỉ mở khi bấm nút chức năng (power_actions),
+			# không tự mở khi hydrate (cần FE có reducer openDialog — P2).
+			"active_dialog_id": None,
 			"dialog_list": {},
 		},
 	},

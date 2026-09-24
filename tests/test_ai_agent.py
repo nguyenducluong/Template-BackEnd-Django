@@ -30,8 +30,8 @@ def _chat_reply(content, tool_calls=None):
 
 class ParseJsonCallTests(SimpleTestCase):
     def test_plain_json(self):
-        r = ToolAgent._parse_json_call('{"tool": "user.get", "args": {"user_id": 1}}')
-        self.assertEqual(r, {"tool": "user.get", "args": {"user_id": 1}})
+        r = ToolAgent._parse_json_call('{"tool": "user.get_by_gen_id", "args": {"gen_id": "00000001"}}')
+        self.assertEqual(r, {"tool": "user.get_by_gen_id", "args": {"gen_id": "00000001"}})
 
     def test_with_code_fence(self):
         r = ToolAgent._parse_json_call('```json\n{"tool": "info.orgs"}\n```')
@@ -52,7 +52,7 @@ class ToolAgentJsonFallbackTests(SimpleTestCase):
     def test_calls_tool_then_summarizes(self):
         client = _fake_client()
         client.chat.side_effect = [
-            _chat_reply('{"tool": "user.get", "args": {"user_id": 7}}'),
+            _chat_reply('{"tool": "user.get_by_gen_id", "args": {"gen_id": "00000007"}}'),
             _chat_reply("User #7: Nguyễn Đức Lương"),
         ]
         user = SimpleNamespace(id=1, org_id=2)
@@ -63,7 +63,7 @@ class ToolAgentJsonFallbackTests(SimpleTestCase):
             )
 
         self.assertEqual(text, "User #7: Nguyễn Đức Lương")
-        ex.assert_called_once_with("user.get", user, {"user_id": 7})
+        ex.assert_called_once_with("user.get_by_gen_id", user, {"gen_id": "00000007"})
 
         # Lượt 2 phải có tin nhắn role "tool" chứa kết quả.
         second_messages = client.chat.call_args_list[1][0][0]
@@ -74,7 +74,7 @@ class ToolAgentJsonFallbackTests(SimpleTestCase):
     def test_permission_denied_no_loop(self):
         client = _fake_client()
         client.chat.side_effect = [
-            _chat_reply('{"tool": "user.get", "args": {}}'),
+            _chat_reply('{"tool": "user.get_by_gen_id", "args": {}}'),
             _chat_reply("xong"),
         ]
         with mock.patch("apps.ai.agent.execute_tool", return_value={

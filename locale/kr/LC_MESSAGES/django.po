@@ -8,8 +8,23 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
+msgid "AI request timed out. Please try again."
+msgstr ""
+
+msgid "AI service is currently unavailable."
+msgstr ""
+
+msgid "AI service is currently unavailable. Please try again later."
+msgstr ""
+
+msgid "API encryption is disabled on this server."
+msgstr ""
+
 msgid "Account is inactive."
 msgstr "계정이 비활성화되었습니다."
+
+msgid "Account is not locked."
+msgstr ""
 
 msgid "Account locked due to too many failed attempts. Try again in %(minutes)d minutes."
 msgstr "로그인 실패 횟수 초과로 계정이 잠겼습니다. %(minutes)d분 후에 다시 시도해 주세요."
@@ -17,20 +32,110 @@ msgstr "로그인 실패 횟수 초과로 계정이 잠겼습니다. %(minutes)d
 msgid "Account unlocked successfully"
 msgstr "계정 잠금이 해제되었습니다"
 
+msgid "Account unlocked successfully."
+msgstr ""
+
 msgid "Account unlocked successfully. You can now log in."
 msgstr "계정 잠금이 해제되었습니다. 지금 로그인할 수 있습니다."
+
+msgid "Action '%(id)s' is not configured for this dialog."
+msgstr "'%(id)s' 작업은 이 대화상자에 구성되어 있지 않습니다."
+
+msgid "Attachments exceed the limit of %(mb)s MB."
+msgstr "첨부 파일이 %(mb)sMB 제한을 초과했습니다."
 
 msgid "Authentication credentials were not provided."
 msgstr "인증 정보가 제공되지 않았습니다."
 
+msgid "Chart"
+msgstr ""
+
+msgid "Chart data loaded"
+msgstr ""
+
+msgid "Chỉ FAQ đang active mới hiển thị"
+msgstr ""
+
+msgid "Code"
+msgstr ""
+
+msgid "Câu hỏi"
+msgstr ""
+
+msgid "Câu trả lời"
+msgstr ""
+
+msgid "Daily Trend"
+msgstr ""
+
+msgid "Dashboard loaded"
+msgstr ""
+
+msgid "Date"
+msgstr ""
+
+msgid "Detail"
+msgstr ""
+
+msgid "Details"
+msgstr ""
+
+msgid "Details data loaded"
+msgstr ""
+
+msgid "Details loaded"
+msgstr ""
+
+msgid "Details payload not implemented for this header."
+msgstr ""
+
+msgid "Dialog '%(id)s' is not configured for this system."
+msgstr "'%(id)s' 대화상자는 이 시스템에 구성되어 있지 않습니다."
+
+msgid "Edit"
+msgstr ""
+
 msgid "Error"
 msgstr "오류"
+
+msgid "Export is not implemented for this system yet (format: %(format)s)."
+msgstr ""
+
+msgid "FAQ"
+msgstr ""
+
+msgid "FAQs"
+msgstr ""
+
+msgid "Failed"
+msgstr ""
+
+msgid "Field 'header_id' must be an integer."
+msgstr ""
+
+msgid "Field 'params' must be a valid JSON object."
+msgstr "'params' 필드는 유효한 JSON 객체여야 합니다."
+
+msgid "Field 'params' must be an object."
+msgstr ""
+
+msgid "Fields 'action_id' and 'record_id' are required."
+msgstr ""
+
+msgid "Fields 'header_id' and 'func' are required."
+msgstr ""
+
+msgid "Function '%(func)s' not found in system %(id)s."
+msgstr ""
 
 msgid "Handshake successful"
 msgstr "핸드셰이크 성공"
 
 msgid "Header structure"
 msgstr "시스템 구조"
+
+msgid "Invalid OTP."
+msgstr ""
 
 msgid "Invalid client public key"
 msgstr "클라이언트 공개키가 잘못되었습니다"
@@ -53,6 +158,9 @@ msgstr "OTP가 잘못되었거나 만료되었습니다"
 msgid "Invalid or expired refresh token"
 msgstr "리프레시 토큰이 잘못되었거나 만료되었습니다"
 
+msgid "Invalid submit data."
+msgstr "제출된 데이터가 올바르지 않습니다."
+
 msgid "Login successful"
 msgstr "로그인 성공"
 
@@ -62,11 +170,23 @@ msgstr "로그아웃 성공"
 msgid "Method \"%(method)s\" not allowed."
 msgstr "\"%(method)s\" 메서드는 허용되지 않습니다."
 
-msgid "Missing or invalid 'public_key' (RSA PEM required)"
-msgstr "'public_key'가 없거나 잘못되었습니다 (RSA PEM 필요)"
+msgid "Missing or invalid 'client_public_key' (RSA PEM required)"
+msgstr ""
+
+msgid "Missing required field(s): %(fields)s."
+msgstr "필수 항목이 누락되었습니다: %(fields)s."
+
+msgid "Name"
+msgstr ""
+
+msgid "No account found with this Knox ID."
+msgstr ""
 
 msgid "No account found with this identifier."
 msgstr "해당 정보로 등록된 계정을 찾을 수 없습니다."
+
+msgid "OTP has expired. Please request a new one."
+msgstr ""
 
 msgid "OTP sent. Please check your email."
 msgstr "OTP를 전송했습니다. 이메일을 확인해 주세요."
@@ -76,6 +196,15 @@ msgstr "기존 비밀번호가 올바르지 않습니다."
 
 msgid "Old password is required."
 msgstr "기존 비밀번호를 입력해 주세요."
+
+msgid "Org"
+msgstr ""
+
+msgid "Pass/Fail Ratio"
+msgstr ""
+
+msgid "Passed"
+msgstr ""
 
 msgid "Password Reset OTP"
 msgstr "비밀번호 재설정 OTP"
@@ -107,6 +236,9 @@ msgstr "비밀번호가 재설정되었습니다"
 msgid "Passwords do not match"
 msgstr "비밀번호가 일치하지 않습니다"
 
+msgid "Phân loại FAQ (vd: Hệ thống, Tài khoản, Dữ liệu QC)"
+msgstr ""
+
 msgid "Profile updated"
 msgstr "프로필이 업데이트되었습니다"
 
@@ -125,6 +257,12 @@ msgstr "리소스를 찾을 수 없습니다"
 msgid "Resource not found."
 msgstr "데이터를 찾을 수 없습니다."
 
+msgid "Search completed"
+msgstr ""
+
+msgid "Server RSA public key is unavailable."
+msgstr ""
+
 msgid "Service degraded"
 msgstr "서비스 성능 저하"
 
@@ -134,8 +272,41 @@ msgstr "서비스 정상"
 msgid "Service temporarily unavailable, try again later."
 msgstr "서비스를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."
 
+msgid "Status"
+msgstr ""
+
+msgid "Submit received but NOT stored (this system has no storage configured)."
+msgstr "데이터를 수신했지만 저장되지 않았습니다 (이 시스템에는 저장소가 구성되어 있지 않습니다)."
+
+msgid "Submitted header does not match the current system."
+msgstr "제출된 헤더가 현재 시스템과 일치하지 않습니다."
+
 msgid "Success"
 msgstr "성공"
+
+msgid "System definition loaded"
+msgstr ""
+
+msgid "System function execution failed."
+msgstr ""
+
+msgid "System header not found."
+msgstr ""
+
+msgid "System module not implemented for this header."
+msgstr ""
+
+msgid "The last message must have role 'user'."
+msgstr ""
+
+msgid "This action is not implemented for this system yet."
+msgstr ""
+
+msgid "This system has no submit handler configured yet."
+msgstr "이 시스템에는 아직 제출 처리가 구성되어 있지 않습니다."
+
+msgid "Thứ tự hiển thị (nhỏ hơn = trước)"
+msgstr ""
 
 msgid "Token refreshed"
 msgstr "토큰이 갱신되었습니다"
@@ -149,11 +320,14 @@ msgstr "요청이 너무 많습니다. %(seconds)d초 후에 다시 시도해 �
 msgid "Too many requests. Please try again later."
 msgstr "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."
 
+msgid "Total"
+msgstr ""
+
+msgid "Value"
+msgstr ""
+
 msgid "You do not have permission to perform this action"
 msgstr "이 작업을 수행할 권한이 없습니다"
-
-msgid "You do not have permission to perform this action."
-msgstr "이 작업을 수행할 권한이 없습니다."
 
 msgid "Your OTP for password reset is %(otp)s. It expires in %(minutes)d minutes."
 msgstr "비밀번호 재설정 OTP는 %(otp)s입니다. %(minutes)d분 후에 만료됩니다."

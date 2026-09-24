@@ -30,3 +30,30 @@ class Header1DetailsRequestSerializer(serializers.Serializer):
 	def validate(self, attrs):
 		attrs.setdefault("query", {})
 		return attrs
+
+
+class SubmitFormFileSerializer(serializers.Serializer):
+	"""1 entry trong params.files — metadata FE gửi, server map với request.FILES."""
+
+	__file_index = serializers.IntegerField(required=False)
+	name = serializers.CharField(required=False, allow_blank=True, default="")
+	size = serializers.IntegerField(required=False, default=0)
+	mime = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class SubmitFormSerializer(serializers.Serializer):
+	"""Body params của func submit_form (dialog SUBMIT_FORM qua dispatcher).
+
+	Validate hình thức (kiểu dữ liệu); validate nghiệp vụ (dialog/action thuộc
+	header, field bắt buộc, power_key, dung lượng file) nằm ở base_system.
+	"""
+
+	header_id = serializers.IntegerField(required=False)
+	dialog_id = serializers.CharField(required=False, allow_blank=True, default="")
+	action_id = serializers.CharField(required=False, allow_blank=True, default="")
+	power_key = serializers.IntegerField(required=False, allow_null=True, default=None)
+	record_id = serializers.JSONField(required=False, allow_null=True, default=None)
+	values = serializers.DictField(child=serializers.JSONField(), required=False, default=dict)
+	files = SubmitFormFileSerializer(many=True, required=False, default=list)
+	query = serializers.DictField(child=serializers.JSONField(), required=False, default=dict)
+	request_id = serializers.CharField(required=False, allow_blank=True, default="")

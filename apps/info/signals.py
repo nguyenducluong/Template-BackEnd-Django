@@ -7,10 +7,11 @@ and cached_full_name for this org and all its descendants.
 
 import logging
 
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from .models import Organization
+from .models import HeaderRegistration, Organization, UserHeaderRegistration
+from .permissions import invalidate_org_permission_cache, invalidate_permission_cache
 
 logger = logging.getLogger(__name__)
 
@@ -39,3 +40,26 @@ def update_hierarchy_cache(sender, instance: Organization, **kwargs):
     except Exception as e:
         # Don't break the save if cache update fails
         logger.warning("Failed to update org hierarchy cache: %s", e)
+
+
+# ---------------------------------------------------------------------------
+# Cache quyền T1 (`systems:perm:{user_id}`) — ROADMAP P1.5
+# ---------------------------------------------------------------------------
+
+@receiver([post_save, post_delete], sender=HeaderRegistration)
+def invalidate_header_registration_cache(sender, instance: HeaderRegistration, **kwargs):
+    """HeaderRegistration đổi → xóa cache quyền của mọi user trong org."""
+    try:
+        invalidate_org_permission_cache(instance.org_id)
+    except Exception as e:
+        # Không để lỗi cache làm hỏng save/delete
+        logger.warning("Failed to invalidate header perm cache for org %s: %s", instance.org_id, e)
+
+
+@receiver([post_save, post_delete], sender=UserHeaderRegistration)
+def invalidate_user_header_registration_cache(sender, instance: UserHeaderRegistration, **kwargs):
+    """UserHeaderRegistration đổi → xóa cache quyền của user đó."""
+    try:
+        invalidate_permission_cache(instance.registered_by_id)
+    except Exception as e:
+        logger.warning("Failed to invalidate user perm cache for user %s: %s", instance.registered_by_id, e)

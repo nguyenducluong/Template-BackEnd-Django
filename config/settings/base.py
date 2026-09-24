@@ -292,7 +292,15 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "Asia/Ho_Chi_Minh"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60
-CELERY_BEAT_SCHEDULE = {}
+CELERY_BEAT_SCHEDULE = {
+    # Dọn JWT blacklist đã hết hạn (bảng _0041_jwt_blacklist) — không có job này
+    # thì bảng chỉ tăng theo mỗi lần logout/refresh, không bao giờ được dọn.
+    # Dùng số giây (không import celery.schedules) để settings không phụ thuộc celery.
+    "accounts-purge-expired-jwt-blacklist": {
+        "task": "accounts.purge_expired_jwt_blacklist",
+        "schedule": 24 * 60 * 60,  # 1 lần/ngày
+    },
+}
 
 # Django REST Framework
 REST_FRAMEWORK = {
@@ -361,14 +369,29 @@ REGISTER_RATE_LIMIT_WINDOW = env.int("REGISTER_RATE_LIMIT_WINDOW", default=3600)
 RATE_LIMIT_GLOBAL_MAX = env.int("RATE_LIMIT_GLOBAL_MAX", default=600)
 RATE_LIMIT_GLOBAL_WINDOW = env.int("RATE_LIMIT_GLOBAL_WINDOW", default=60)
 ENABLE_GLOBAL_RATE_LIMIT = env.bool("ENABLE_GLOBAL_RATE_LIMIT", default=True)
-RATE_LIMIT_EXCLUDED_PREFIXES = env.list(
-    "RATE_LIMIT_EXCLUDED_PREFIXES",
-    default=["/admin", "/api/v1/health", "/static", "/media", "/docs", "/schema"],
+# Prefix phải khớp path THẬT của URLconf (config/urls.py):
+#   health = /api/v1/health, tài liệu = /api/docs + /api/schema + /api/redoc.
+# Trước đây ghi /api/health, /docs, /schema → không khớp prefix nào, health check
+# của monitoring vẫn bị tính vào rate limit và có thể nhận 429 giả.
+RATE_LIMIT_ALWAYS_EXCLUDED = [
+    "/admin",
+    "/api/v1/health",
+    "/static",
+    "/media",
+    "/api/docs",
+    "/api/schema",
+    "/api/redoc",
+]
+# .env chỉ THÊM prefix (không thể làm mất các path bắt buộc ở trên) — dedupe
+# bằng dict.fromkeys để giữ thứ tự và tránh trùng (ví dụ /api/v1/crypto).
+RATE_LIMIT_EXCLUDED_PREFIXES = list(
+    dict.fromkeys(RATE_LIMIT_ALWAYS_EXCLUDED + env.list("RATE_LIMIT_EXCLUDED_PREFIXES", default=[]))
 )
 
 # Global rate limit middleware respects these (never double-counts endpoints
 # that already have fine-grained throttles). Disable in tests/dev if noisy.
-RATE_LIMIT_EXCLUDED_PREFIXES += ["/api/v1/crypto"]
+if "/api/v1/crypto" not in RATE_LIMIT_EXCLUDED_PREFIXES:
+    RATE_LIMIT_EXCLUDED_PREFIXES.append("/api/v1/crypto")
 
 # Trusted reverse proxies. X-Forwarded-For is ONLY honoured for rate limiting
 # when the direct peer (REMOTE_ADDR) is listed here — otherwise clients could
@@ -461,6 +484,23 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
 EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@example.com")
+
+# ---------------------------------------------------------------------------
+# Systems / dialog actions (apps.systems dispatcher)
+# ---------------------------------------------------------------------------
+# Hành vi mặc định của `submit_form` khi hệ thống CHƯA có nơi lưu dữ liệu:
+#   "echo"   → trả success + echo dữ liệu đã nhận (persisted=False) để FE chạy được
+#              end-to-end (mặc định ở dev).
+#   "reject" → trả 501 Not Implemented (khuyến nghị cho production khi chưa cấu hình).
+SYSTEMS_SUBMIT_DEFAULT = env("SYSTEMS_SUBMIT_DEFAULT", default="echo")
+# Giới hạn tổng dung lượng file đính kèm cho 1 lần submit (MB) — server tự kiểm tra,
+# KHÔNG dựa vào FE. Lưu ý: DATA_UPLOAD_MAX_MEMORY_SIZE của Django chỉ áp cho phần
+# non-file, nên file upload cần giới hạn riêng ở đây.
+SYSTEMS_UPLOAD_MAX_MB = env.int("SYSTEMS_UPLOAD_MAX_MB", default=15)
+# TTL cache quyền header theo user (quyền T1) — key `systems:perm:{user_id}`
+# trong apps/info/permissions.py. Đổi quyền qua model sẽ xóa cache ngay bằng
+# signal (apps/info/signals.py); TTL chỉ là lớp dự phòng.
+SYSTEMS_PERM_CACHE_TTL = env.int("SYSTEMS_PERM_CACHE_TTL", default=60)
 
 # Logging
 LOGGING = {

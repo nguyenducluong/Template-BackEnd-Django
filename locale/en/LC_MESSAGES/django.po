@@ -8,8 +8,23 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
+msgid "AI request timed out. Please try again."
+msgstr "AI request timed out. Please try again."
+
+msgid "AI service is currently unavailable."
+msgstr "AI service is currently unavailable."
+
+msgid "AI service is currently unavailable. Please try again later."
+msgstr "AI service is currently unavailable. Please try again later."
+
+msgid "API encryption is disabled on this server."
+msgstr "API encryption is disabled on this server."
+
 msgid "Account is inactive."
 msgstr "Account is inactive."
+
+msgid "Account is not locked."
+msgstr "Account is not locked."
 
 msgid "Account locked due to too many failed attempts. Try again in %(minutes)d minutes."
 msgstr "Account locked due to too many failed attempts. Try again in %(minutes)d minutes."
@@ -17,20 +32,110 @@ msgstr "Account locked due to too many failed attempts. Try again in %(minutes)d
 msgid "Account unlocked successfully"
 msgstr "Account unlocked successfully"
 
+msgid "Account unlocked successfully."
+msgstr "Account unlocked successfully."
+
 msgid "Account unlocked successfully. You can now log in."
 msgstr "Account unlocked successfully. You can now log in."
+
+msgid "Action '%(id)s' is not configured for this dialog."
+msgstr "Action '%(id)s' is not configured for this dialog."
+
+msgid "Attachments exceed the limit of %(mb)s MB."
+msgstr "Attachments exceed the limit of %(mb)s MB."
 
 msgid "Authentication credentials were not provided."
 msgstr "Authentication credentials were not provided."
 
+msgid "Chart"
+msgstr "Chart"
+
+msgid "Chart data loaded"
+msgstr "Chart data loaded"
+
+msgid "Chỉ FAQ đang active mới hiển thị"
+msgstr "Chỉ FAQ đang active mới hiển thị"
+
+msgid "Code"
+msgstr "Code"
+
+msgid "Câu hỏi"
+msgstr "Câu hỏi"
+
+msgid "Câu trả lời"
+msgstr "Câu trả lời"
+
+msgid "Daily Trend"
+msgstr "Daily Trend"
+
+msgid "Dashboard loaded"
+msgstr "Dashboard loaded"
+
+msgid "Date"
+msgstr "Date"
+
+msgid "Detail"
+msgstr "Detail"
+
+msgid "Details"
+msgstr "Details"
+
+msgid "Details data loaded"
+msgstr "Details data loaded"
+
+msgid "Details loaded"
+msgstr "Details loaded"
+
+msgid "Details payload not implemented for this header."
+msgstr "Details payload not implemented for this header."
+
+msgid "Dialog '%(id)s' is not configured for this system."
+msgstr "Dialog '%(id)s' is not configured for this system."
+
+msgid "Edit"
+msgstr "Edit"
+
 msgid "Error"
 msgstr "Error"
+
+msgid "Export is not implemented for this system yet (format: %(format)s)."
+msgstr "Export is not implemented for this system yet (format: %(format)s)."
+
+msgid "FAQ"
+msgstr "FAQ"
+
+msgid "FAQs"
+msgstr "FAQs"
+
+msgid "Failed"
+msgstr "Failed"
+
+msgid "Field 'header_id' must be an integer."
+msgstr "Field 'header_id' must be an integer."
+
+msgid "Field 'params' must be a valid JSON object."
+msgstr "Field 'params' must be a valid JSON object."
+
+msgid "Field 'params' must be an object."
+msgstr "Field 'params' must be an object."
+
+msgid "Fields 'action_id' and 'record_id' are required."
+msgstr "Fields 'action_id' and 'record_id' are required."
+
+msgid "Fields 'header_id' and 'func' are required."
+msgstr "Fields 'header_id' and 'func' are required."
+
+msgid "Function '%(func)s' not found in system %(id)s."
+msgstr "Function '%(func)s' not found in system %(id)s."
 
 msgid "Handshake successful"
 msgstr "Handshake successful"
 
 msgid "Header structure"
 msgstr "Header structure"
+
+msgid "Invalid OTP."
+msgstr "Invalid OTP."
 
 msgid "Invalid client public key"
 msgstr "Invalid client public key"
@@ -53,6 +158,9 @@ msgstr "Invalid or expired OTP"
 msgid "Invalid or expired refresh token"
 msgstr "Invalid or expired refresh token"
 
+msgid "Invalid submit data."
+msgstr "Invalid submit data."
+
 msgid "Login successful"
 msgstr "Login successful"
 
@@ -62,11 +170,23 @@ msgstr "Logout successful"
 msgid "Method \"%(method)s\" not allowed."
 msgstr "Method \"%(method)s\" not allowed."
 
-msgid "Missing or invalid 'public_key' (RSA PEM required)"
-msgstr "Missing or invalid 'public_key' (RSA PEM required)"
+msgid "Missing or invalid 'client_public_key' (RSA PEM required)"
+msgstr "Missing or invalid 'client_public_key' (RSA PEM required)"
+
+msgid "Missing required field(s): %(fields)s."
+msgstr "Missing required field(s): %(fields)s."
+
+msgid "Name"
+msgstr "Name"
+
+msgid "No account found with this Knox ID."
+msgstr "No account found with this Knox ID."
 
 msgid "No account found with this identifier."
 msgstr "No account found with this identifier."
+
+msgid "OTP has expired. Please request a new one."
+msgstr "OTP has expired. Please request a new one."
 
 msgid "OTP sent. Please check your email."
 msgstr "OTP sent. Please check your email."
@@ -76,6 +196,15 @@ msgstr "Old password is incorrect."
 
 msgid "Old password is required."
 msgstr "Old password is required."
+
+msgid "Org"
+msgstr "Org"
+
+msgid "Pass/Fail Ratio"
+msgstr "Pass/Fail Ratio"
+
+msgid "Passed"
+msgstr "Passed"
 
 msgid "Password Reset OTP"
 msgstr "Password Reset OTP"
@@ -107,6 +236,9 @@ msgstr "Password reset successfully"
 msgid "Passwords do not match"
 msgstr "Passwords do not match"
 
+msgid "Phân loại FAQ (vd: Hệ thống, Tài khoản, Dữ liệu QC)"
+msgstr "Phân loại FAQ (vd: Hệ thống, Tài khoản, Dữ liệu QC)"
+
 msgid "Profile updated"
 msgstr "Profile updated"
 
@@ -125,6 +257,12 @@ msgstr "Resource not found"
 msgid "Resource not found."
 msgstr "Resource not found."
 
+msgid "Search completed"
+msgstr "Search completed"
+
+msgid "Server RSA public key is unavailable."
+msgstr "Server RSA public key is unavailable."
+
 msgid "Service degraded"
 msgstr "Service degraded"
 
@@ -134,8 +272,41 @@ msgstr "Service healthy"
 msgid "Service temporarily unavailable, try again later."
 msgstr "Service temporarily unavailable, try again later."
 
+msgid "Status"
+msgstr "Status"
+
+msgid "Submit received but NOT stored (this system has no storage configured)."
+msgstr "Submit received but NOT stored (this system has no storage configured)."
+
+msgid "Submitted header does not match the current system."
+msgstr "Submitted header does not match the current system."
+
 msgid "Success"
 msgstr "Success"
+
+msgid "System definition loaded"
+msgstr "System definition loaded"
+
+msgid "System function execution failed."
+msgstr "System function execution failed."
+
+msgid "System header not found."
+msgstr "System header not found."
+
+msgid "System module not implemented for this header."
+msgstr "System module not implemented for this header."
+
+msgid "The last message must have role 'user'."
+msgstr "The last message must have role 'user'."
+
+msgid "This action is not implemented for this system yet."
+msgstr "This action is not implemented for this system yet."
+
+msgid "This system has no submit handler configured yet."
+msgstr "This system has no submit handler configured yet."
+
+msgid "Thứ tự hiển thị (nhỏ hơn = trước)"
+msgstr "Thứ tự hiển thị (nhỏ hơn = trước)"
 
 msgid "Token refreshed"
 msgstr "Token refreshed"
@@ -149,11 +320,14 @@ msgstr "Too many requests. Please try again in %(seconds)d second(s)."
 msgid "Too many requests. Please try again later."
 msgstr "Too many requests. Please try again later."
 
+msgid "Total"
+msgstr "Total"
+
+msgid "Value"
+msgstr "Value"
+
 msgid "You do not have permission to perform this action"
 msgstr "You do not have permission to perform this action"
-
-msgid "You do not have permission to perform this action."
-msgstr "You do not have permission to perform this action."
 
 msgid "Your OTP for password reset is %(otp)s. It expires in %(minutes)d minutes."
 msgstr "Your OTP for password reset is %(otp)s. It expires in %(minutes)d minutes."

@@ -8,8 +8,23 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
+msgid "AI request timed out. Please try again."
+msgstr ""
+
+msgid "AI service is currently unavailable."
+msgstr ""
+
+msgid "AI service is currently unavailable. Please try again later."
+msgstr ""
+
+msgid "API encryption is disabled on this server."
+msgstr ""
+
 msgid "Account is inactive."
 msgstr "Tài khoản không hoạt động."
+
+msgid "Account is not locked."
+msgstr ""
 
 msgid "Account locked due to too many failed attempts. Try again in %(minutes)d minutes."
 msgstr "Tài khoản đã bị khóa do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau %(minutes)d phút."
@@ -17,20 +32,110 @@ msgstr "Tài khoản đã bị khóa do đăng nhập sai quá nhiều lần. Vu
 msgid "Account unlocked successfully"
 msgstr "Mở khóa tài khoản thành công"
 
+msgid "Account unlocked successfully."
+msgstr ""
+
 msgid "Account unlocked successfully. You can now log in."
 msgstr "Mở khóa tài khoản thành công. Bạn có thể đăng nhập ngay bây giờ."
+
+msgid "Action '%(id)s' is not configured for this dialog."
+msgstr "Hành động '%(id)s' không được cấu hình cho dialog này."
+
+msgid "Attachments exceed the limit of %(mb)s MB."
+msgstr "Tệp đính kèm vượt quá giới hạn %(mb)s MB."
 
 msgid "Authentication credentials were not provided."
 msgstr "Thông tin xác thực chưa được cung cấp."
 
+msgid "Chart"
+msgstr ""
+
+msgid "Chart data loaded"
+msgstr ""
+
+msgid "Chỉ FAQ đang active mới hiển thị"
+msgstr ""
+
+msgid "Code"
+msgstr ""
+
+msgid "Câu hỏi"
+msgstr ""
+
+msgid "Câu trả lời"
+msgstr ""
+
+msgid "Daily Trend"
+msgstr ""
+
+msgid "Dashboard loaded"
+msgstr ""
+
+msgid "Date"
+msgstr ""
+
+msgid "Detail"
+msgstr ""
+
+msgid "Details"
+msgstr ""
+
+msgid "Details data loaded"
+msgstr ""
+
+msgid "Details loaded"
+msgstr ""
+
+msgid "Details payload not implemented for this header."
+msgstr ""
+
+msgid "Dialog '%(id)s' is not configured for this system."
+msgstr "Dialog '%(id)s' không được cấu hình cho hệ thống này."
+
+msgid "Edit"
+msgstr ""
+
 msgid "Error"
 msgstr "Lỗi"
+
+msgid "Export is not implemented for this system yet (format: %(format)s)."
+msgstr ""
+
+msgid "FAQ"
+msgstr ""
+
+msgid "FAQs"
+msgstr ""
+
+msgid "Failed"
+msgstr ""
+
+msgid "Field 'header_id' must be an integer."
+msgstr ""
+
+msgid "Field 'params' must be a valid JSON object."
+msgstr "Trường 'params' phải là một JSON object hợp lệ."
+
+msgid "Field 'params' must be an object."
+msgstr ""
+
+msgid "Fields 'action_id' and 'record_id' are required."
+msgstr ""
+
+msgid "Fields 'header_id' and 'func' are required."
+msgstr ""
+
+msgid "Function '%(func)s' not found in system %(id)s."
+msgstr ""
 
 msgid "Handshake successful"
 msgstr "Bắt tay thành công"
 
 msgid "Header structure"
 msgstr "Cấu trúc hệ thống"
+
+msgid "Invalid OTP."
+msgstr ""
 
 msgid "Invalid client public key"
 msgstr "Public key của client không hợp lệ"
@@ -53,6 +158,9 @@ msgstr "OTP không hợp lệ hoặc đã hết hạn"
 msgid "Invalid or expired refresh token"
 msgstr "Refresh token không hợp lệ hoặc đã hết hạn"
 
+msgid "Invalid submit data."
+msgstr "Dữ liệu gửi lên không hợp lệ."
+
 msgid "Login successful"
 msgstr "Đăng nhập thành công"
 
@@ -62,11 +170,23 @@ msgstr "Đăng xuất thành công"
 msgid "Method \"%(method)s\" not allowed."
 msgstr "Phương thức \"%(method)s\" không được hỗ trợ."
 
-msgid "Missing or invalid 'public_key' (RSA PEM required)"
-msgstr "Thiếu hoặc sai 'public_key' (yêu cầu RSA PEM)"
+msgid "Missing or invalid 'client_public_key' (RSA PEM required)"
+msgstr ""
+
+msgid "Missing required field(s): %(fields)s."
+msgstr "Thiếu thông tin bắt buộc: %(fields)s."
+
+msgid "Name"
+msgstr ""
+
+msgid "No account found with this Knox ID."
+msgstr ""
 
 msgid "No account found with this identifier."
 msgstr "Không tìm thấy tài khoản với thông tin này."
+
+msgid "OTP has expired. Please request a new one."
+msgstr ""
 
 msgid "OTP sent. Please check your email."
 msgstr "Đã gửi OTP. Vui lòng kiểm tra email của bạn."
@@ -76,6 +196,15 @@ msgstr "Mật khẩu cũ không đúng."
 
 msgid "Old password is required."
 msgstr "Vui lòng nhập mật khẩu cũ."
+
+msgid "Org"
+msgstr ""
+
+msgid "Pass/Fail Ratio"
+msgstr ""
+
+msgid "Passed"
+msgstr ""
 
 msgid "Password Reset OTP"
 msgstr "OTP đặt lại mật khẩu"
@@ -107,6 +236,9 @@ msgstr "Đặt lại mật khẩu thành công"
 msgid "Passwords do not match"
 msgstr "Mật khẩu không khớp"
 
+msgid "Phân loại FAQ (vd: Hệ thống, Tài khoản, Dữ liệu QC)"
+msgstr ""
+
 msgid "Profile updated"
 msgstr "Cập nhật hồ sơ thành công"
 
@@ -125,6 +257,12 @@ msgstr "Không tìm thấy tài nguyên"
 msgid "Resource not found."
 msgstr "Không tìm thấy dữ liệu."
 
+msgid "Search completed"
+msgstr ""
+
+msgid "Server RSA public key is unavailable."
+msgstr ""
+
 msgid "Service degraded"
 msgstr "Dịch vụ suy giảm"
 
@@ -134,8 +272,41 @@ msgstr "Dịch vụ hoạt động bình thường"
 msgid "Service temporarily unavailable, try again later."
 msgstr "Dịch vụ tạm thời không khả dụng, vui lòng thử lại sau."
 
+msgid "Status"
+msgstr ""
+
+msgid "Submit received but NOT stored (this system has no storage configured)."
+msgstr "Đã nhận dữ liệu nhưng CHƯA lưu (hệ thống chưa cấu hình nơi lưu)."
+
+msgid "Submitted header does not match the current system."
+msgstr "Header gửi lên không trùng với hệ thống đang mở."
+
 msgid "Success"
 msgstr "Thành công"
+
+msgid "System definition loaded"
+msgstr ""
+
+msgid "System function execution failed."
+msgstr ""
+
+msgid "System header not found."
+msgstr ""
+
+msgid "System module not implemented for this header."
+msgstr ""
+
+msgid "The last message must have role 'user'."
+msgstr ""
+
+msgid "This action is not implemented for this system yet."
+msgstr ""
+
+msgid "This system has no submit handler configured yet."
+msgstr "Hệ thống này chưa được cấu hình nơi lưu dữ liệu."
+
+msgid "Thứ tự hiển thị (nhỏ hơn = trước)"
+msgstr ""
 
 msgid "Token refreshed"
 msgstr "Làm mới token thành công"
@@ -149,11 +320,14 @@ msgstr "Quá nhiều yêu cầu. Vui lòng thử lại sau %(seconds)d giây."
 msgid "Too many requests. Please try again later."
 msgstr "Quá nhiều yêu cầu. Vui lòng thử lại sau."
 
+msgid "Total"
+msgstr ""
+
+msgid "Value"
+msgstr ""
+
 msgid "You do not have permission to perform this action"
 msgstr "Bạn không có quyền thực hiện hành động này"
-
-msgid "You do not have permission to perform this action."
-msgstr "Bạn không có quyền thực hiện hành động này."
 
 msgid "Your OTP for password reset is %(otp)s. It expires in %(minutes)d minutes."
 msgstr "Mã OTP đặt lại mật khẩu của bạn là %(otp)s. Mã hết hạn sau %(minutes)d phút."

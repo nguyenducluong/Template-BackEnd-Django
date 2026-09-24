@@ -89,7 +89,7 @@ TRANSLATIONS = {
         "vi": "Bạn không có quyền thực hiện hành động này",
         "kr": "이 작업을 수행할 권한이 없습니다",
     },
-    "You do not have permission to perform this action.": {
+    "You do not have permission to perform this action": {
         "vi": "Bạn không có quyền thực hiện hành động này.",
         "kr": "이 작업을 수행할 권한이 없습니다.",
     },
@@ -131,5 +131,39 @@ TRANSLATIONS = {
     "Password Reset OTP": {"vi": "OTP đặt lại mật khẩu", "kr": "비밀번호 재설정 OTP"},
     "Password reset successfully": {"vi": "Đặt lại mật khẩu thành công", "kr": "비밀번호가 재설정되었습니다"},
     "Passwords do not match": {"vi": "Mật khẩu không khớp", "kr": "비밀번호가 일치하지 않습니다"},
+    # ---- Systems dialog submit (P1 — SUBMIT_FORM) ----
+    "Action '%(id)s' is not configured for this dialog.": {
+        "vi": "Hành động '%(id)s' không được cấu hình cho dialog này.",
+        "kr": "'%(id)s' 작업은 이 대화상자에 구성되어 있지 않습니다.",
+    },
+    "Attachments exceed the limit of %(mb)s MB.": {
+        "vi": "Tệp đính kèm vượt quá giới hạn %(mb)s MB.",
+        "kr": "첨부 파일이 %(mb)sMB 제한을 초과했습니다.",
+    },
+    "Dialog '%(id)s' is not configured for this system.": {
+        "vi": "Dialog '%(id)s' không được cấu hình cho hệ thống này.",
+        "kr": "'%(id)s' 대화상자는 이 시스템에 구성되어 있지 않습니다.",
+    },
+    "Field 'params' must be a valid JSON object.": {
+        "vi": "Trường 'params' phải là một JSON object hợp lệ.",
+        "kr": "'params' 필드는 유효한 JSON 객체여야 합니다.",
+    },
+    "Invalid submit data.": {"vi": "Dữ liệu gửi lên không hợp lệ.", "kr": "제출된 데이터가 올바르지 않습니다."},
+    "Missing required field(s): %(fields)s.": {
+        "vi": "Thiếu thông tin bắt buộc: %(fields)s.",
+        "kr": "필수 항목이 누락되었습니다: %(fields)s.",
+    },
+    "Submit received but NOT stored (this system has no storage configured).": {
+        "vi": "Đã nhận dữ liệu nhưng CHƯA lưu (hệ thống chưa cấu hình nơi lưu).",
+        "kr": "데이터를 수신했지만 저장되지 않았습니다 (이 시스템에는 저장소가 구성되어 있지 않습니다).",
+    },
+    "Submitted header does not match the current system.": {
+        "vi": "Header gửi lên không trùng với hệ thống đang mở.",
+        "kr": "제출된 헤더가 현재 시스템과 일치하지 않습니다.",
+    },
+    "This system has no submit handler configured yet.": {
+        "vi": "Hệ thống này chưa được cấu hình nơi lưu dữ liệu.",
+        "kr": "이 시스템에는 아직 제출 처리가 구성되어 있지 않습니다.",
+    },
 }
 

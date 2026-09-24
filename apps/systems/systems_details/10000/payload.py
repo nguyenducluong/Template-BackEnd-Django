@@ -5,7 +5,7 @@ Port từ STD/src/redux/systemSlice/detailsSlice/example/_1.jsx sang Python dict
 Cấu trúc: { config, data, initial_state } — đúng blueprint frontend render.
 """
 
-HEADER_ID = 3
+HEADER_ID = 10000
 
 DETAILS = {
 	"config": {
@@ -153,25 +153,27 @@ DETAILS = {
 				"header": {"label": "@dialog.dlg_input_system.header.label", "minimize": True, "maximize": True, "close": True},
 				"sections": [
 					{
+       			"key": "info_section",
 						"type": "column",
 						"show": True,
 						"label": "@dialog.dlg_input_system.sections.0.label",
 						"columns": 4,
 						"fields": [
-							{"title": {"text": "Vendor Sorting", "require": True}, "options": {"type": "input", "width": 1}},
-							{"title": {"text": "Vendor Sorting", "require": True}, "options": {"type": "input", "width": 1}},
-							{"title": {"text": "Vendor Sorting", "require": True}, "options": {"type": "input", "width": 1}},
-							{"title": {"text": "Vendor Sorting", "require": True}, "options": {"type": "input", "width": 1}},
-							{"title": {"text": "Vendor Sorting", "require": True}, "options": {"type": "input", "width": 2}},
-							{"title": {"text": "Vendor Sorting", "require": True}, "options": {"type": "input", "width": 2}},
-							{"title": {"text": "Vendor Sorting", "require": True}, "options": {"type": "input", "width": 2, "height": 4}},
-							{"title": {"text": "Vendor Sorting", "require": True}, "options": {"type": "input", "width": 2}},
-							{"title": {"text": "Vendor Sorting", "require": True}, "options": {"type": "input", "width": 2}},
-							{"title": {"text": "Vendor Sorting", "require": True}, "options": {"type": "input", "width": 2}},
-							{"title": {"text": "Vendor SortingVendor SortingVendor SortingVendor Sorting", "require": True}, "options": {"type": "input", "width": 2}},
+							{"title": {"text": "Team", "required": True, "key" : "team_id"}, "options": {"type": "tree", "width": 1}},
+							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 1}},
+							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 1}},
+							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 1}},
+							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 2}},
+							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 2}},
+							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 2, "height": 4}},
+							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 2}},
+							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 2}},
+							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 2}},
+							{"title": {"text": "Vendor SortingVendor SortingVendor SortingVendor Sorting", "required": True}, "options": {"type": "input", "width": 2}},
 						],
 					},
 					{
+						"key": "attachment_section",
 						"type": "attachment",
 						"show": True,
 						"label": "@dialog.dlg_input_system.sections.1.label",
@@ -208,7 +210,7 @@ DETAILS = {
 						# Field bắt buộc: FE chặn trước, BE validate lại (không tin client)
 						"validate": {"required": []},
 						# Hành vi sau khi submit thành công
-						"on_success": {"refresh": "data", "close_dialog": True, "remove_history": True},
+						"on_success": {"refresh": "data", "close_dialog": False, "remove_history": False},
 						"confirmation": {
 							"title": "@dialog.dlg_input_system.actions.1.confirmation.title",
 							"message": "@dialog.dlg_input_system.actions.1.confirmation.message",

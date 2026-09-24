@@ -101,7 +101,7 @@ class ConflictError(APIException):
 
 class ForbiddenError(APIException):
     status_code = status.HTTP_403_FORBIDDEN
-    default_detail = _("You do not have permission to perform this action.")
+    default_detail = _("You do not have permission to perform this action")
     default_code = "forbidden"
 
 

@@ -55,10 +55,19 @@ def translate_details(obj, lang, translations):
     return obj
 
 
-def translate_payload(payload, lang, header_id):
-    """Deepcopy payload rồi thay marker theo lang. Header chưa có translations → trả nguyên."""
+def translate_payload(payload, lang, header_id, copy_payload=True):
+    """Thay marker trong payload theo lang.
+
+    copy_payload=True  (mặc định — giữ hành vi cũ): deepcopy trước khi dịch, dùng khi
+        caller vẫn giữ tham chiếu payload gốc (ví dụ dict tĩnh của module payload.py).
+    copy_payload=False: KHÔNG copy thêm — ``translate_details`` vốn đã dựng dict/list
+        MỚI nên an toàn khi caller đã có bản copy riêng. Dùng để tránh copy 2 lần/request.
+
+    Header chưa có translations → trả nguyên payload (không copy) như trước.
+    """
     translations = get_header_translations(header_id)
     if not translations:
         return payload
     normalized = lang if lang in LANGUAGES else DEFAULT_LANG
-    return translate_details(copy.deepcopy(payload), normalized, translations)
+    source = copy.deepcopy(payload) if copy_payload else payload
+    return translate_details(source, normalized, translations)

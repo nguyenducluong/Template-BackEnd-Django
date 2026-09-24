@@ -1,6 +1,8 @@
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
-python_files = ["tests/**/test_*.py", "tests/**/*_test.py"]
+# Pattern chuẩn: KHÔNG dùng "tests/**/test_*.py" — glob đó không khớp file nằm trực
+# tiếp trong tests/ ⇒ `pytest` / `make test` thu 0 test (bug cấu hình cũ).
+python_files = ["test_*.py", "*_test.py"]
 testpaths = ["tests"]
 addopts = "--reuse-db --no-migrations -v"
 
