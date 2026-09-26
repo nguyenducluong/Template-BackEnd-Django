@@ -153,3 +153,37 @@ class HasHeaderPermission(BasePermission):
         except (TypeError, ValueError):
             return True  # header_id sai kiểu → view tự trả 400
         return user_has_header_permission(user, header_id)
+
+
+class CanWriteInfoConfig(BasePermission):
+    """DRF permission cho các action GHI của dispatcher info (create/update/delete/reorder).
+
+    Fail-closed — phải thoả ĐỒNG THỜI:
+        1. ``settings.INFO_DISPATCH_WRITE_ENABLED = True`` (mặc định False: chưa có
+           màn hình quản trị header nên tắt hẳn đường ghi ở production).
+        2. User có ít nhất 1 power trong ``settings.INFO_DISPATCH_ALLOWED_POWERS``
+           (``SystemPower.id`` hoặc ``SystemPower.power_en`` — tra qua
+           ``apps.ai.tools.base.has_power`` trên `_0039`/`_0040`).
+
+    ``apps.accounts.models.User`` là model thuần (không có ``is_staff``) nên
+    KHÔNG dùng được ``rest_framework.permissions.IsAdminUser``.
+    """
+
+    message = _("You do not have permission to change header configuration.")
+
+    def has_permission(self, request, view):
+        user = getattr(request, "user", None)
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if not getattr(settings, "INFO_DISPATCH_WRITE_ENABLED", False):
+            return False
+        powers = list(getattr(settings, "INFO_DISPATCH_ALLOWED_POWERS", None) or [])
+        if not powers:
+            return False
+
+        from apps.ai.tools.base import has_power  # tránh import vòng khi app nạp
+
+        try:
+            return has_power(user, powers)
+        except Exception:  # noqa: BLE001 — fail-closed, không để lỗi quyền thành 500
+            return False

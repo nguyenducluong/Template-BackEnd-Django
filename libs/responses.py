@@ -37,9 +37,27 @@ def created_response(data=None, message=None):
     return success_response(data=data, message=message, status=201)
 
 
+def deleted_response(data=None, message=None):
+    """Response cho thao tác xoá thành công — 200 + envelope (không dùng 204).
+
+    Lý do KHÔNG dùng 204: ``libs.middlewares.encryption.EncryptionMiddleware``
+    bỏ qua response 204 (không có body để mã hoá) ⇒ client đang bật mã hoá nhận
+    response rỗng, không giải mã được. Trả 200 + envelope giữ contract đồng nhất.
+
+    Method dùng để xoá là ``POST`` (không dùng DELETE — xem libs/http_policy.py).
+    """
+    if message is None:
+        message = _("Deleted successfully")
+    return success_response(data=data, message=message, status=200)
+
+
 def no_content_response():
-    """Response for successful deletion (204)."""
-    return Response(status=204)
+    """DEPRECATED — giữ lại để không phá import cũ.
+
+    Trước đây trả 204 cho thao tác xoá; đã thay bằng ``deleted_response()``
+    (200 + envelope) để response luôn được mã hoá/parse đồng nhất.
+    """
+    return deleted_response()
 
 
 class EnvelopeMixin:
@@ -68,7 +86,13 @@ class EnvelopeMixin:
         return self._envelope(super().retrieve(request, *args, **kwargs))
 
     def create(self, request, *args, **kwargs):
-        return self._envelope(super().create(request, *args, **kwargs), _("Resource created successfully"))
+        """POST tạo mới → 201 (KHÔNG dùng PUT/PATCH/DELETE để ghi dữ liệu)."""
+        response = self._envelope(super().create(request, *args, **kwargs), _("Resource created successfully"))
+        response.status_code = 201
+        # _envelope() tạo meta với status_code=200 → cập nhật lại cho khớp HTTP status
+        if isinstance(getattr(response, "data", None), dict) and isinstance(response.data.get("meta"), dict):
+            response.data["meta"]["status_code"] = 201
+        return response
 
     def update(self, request, *args, **kwargs):
         return self._envelope(super().update(request, *args, **kwargs))

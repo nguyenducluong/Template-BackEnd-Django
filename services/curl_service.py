@@ -38,7 +38,7 @@ class HTTPService:
                 total=3,
                 backoff_factor=1,
                 status_forcelist=[429, 500, 502, 503, 504],
-                allowed_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+                allowed_methods=["GET", "POST"],
             )
             adapter = HTTPAdapter(
                 max_retries=retry_strategy,
@@ -80,17 +80,13 @@ class HTTPService:
         """HTTP POST request."""
         return self.request("POST", path, **kwargs)
 
-    def put(self, path: str, **kwargs) -> requests.Response:
-        """HTTP PUT request."""
-        return self.request("PUT", path, **kwargs)
-
-    def patch(self, path: str, **kwargs) -> requests.Response:
-        """HTTP PATCH request."""
-        return self.request("PATCH", path, **kwargs)
-
-    def delete(self, path: str, **kwargs) -> requests.Response:
-        """HTTP DELETE request."""
-        return self.request("DELETE", path, **kwargs)
+    # ---- PUT / PATCH / DELETE đã bị loại bỏ ---------------------------------
+    # Quy ước dự án: chỉ GET/POST (xem libs/http_policy.py). Mọi thao tác ghi
+    # (update/delete) của API nội bộ đi qua POST bằng cách gửi thêm tham số
+    # hành động trong body, ví dụ:
+    #     http.post("/resource/12/update", json={"name": "..."})
+    #     http.post("/resource/12/delete", json={})
+    # Không thêm lại put()/patch()/delete() ở đây.
 
     # ---- Async Methods ----
 

@@ -1,8 +1,10 @@
 """
-Organization signals for maintaining denormalized hierarchy cache.
+Signals của app info:
 
-When an organization's name or parent changes, update cached_full_path
-and cached_full_name for this org and all its descendants.
+1. Cache cây phân cấp Organization (``cached_full_path``/``cached_full_name``).
+2. Cache quyền T1 theo user (``systems:perm:{user_id}``) — ROADMAP P1.5.
+3. Cache cây menu header (``info:structure:*``) — vô hiệu hoá khi Group/Pages/
+   SystemHeader hoặc đăng ký header thay đổi.
 """
 
 import logging
@@ -10,8 +12,16 @@ import logging
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from .models import HeaderRegistration, Organization, UserHeaderRegistration
+from .models import (
+    GroupHeader,
+    HeaderRegistration,
+    Organization,
+    PagesHeader,
+    SystemHeader,
+    UserHeaderRegistration,
+)
 from .permissions import invalidate_org_permission_cache, invalidate_permission_cache
+from .services import invalidate_structure_cache
 
 logger = logging.getLogger(__name__)
 
@@ -63,3 +73,32 @@ def invalidate_user_header_registration_cache(sender, instance: UserHeaderRegist
         invalidate_permission_cache(instance.registered_by_id)
     except Exception as e:
         logger.warning("Failed to invalidate user perm cache for user %s: %s", instance.registered_by_id, e)
+
+
+# ---------------------------------------------------------------------------
+# Cache cây menu header (`info:structure:*`) — tối ưu hệ thống
+#
+# Cây menu được cache theo (user, ngôn ngữ). Mọi thay đổi về cấu trúc
+# (Group/Pages/SystemHeader) hoặc về đăng ký header đều phải vô hiệu hoá cache,
+# nếu không user sẽ thấy menu cũ tới 5 phút (INFO_STRUCTURE_CACHE_TTL).
+# ---------------------------------------------------------------------------
+
+@receiver([post_save, post_delete], sender=GroupHeader)
+@receiver([post_save, post_delete], sender=PagesHeader)
+@receiver([post_save, post_delete], sender=SystemHeader)
+def invalidate_header_structure_cache(sender, instance, **kwargs):
+    """Group/Pages/SystemHeader đổi → vô hiệu hoá cache cây menu của mọi user."""
+    try:
+        invalidate_structure_cache()
+    except Exception as e:
+        logger.warning("Failed to invalidate header structure cache: %s", e)
+
+
+@receiver([post_save, post_delete], sender=HeaderRegistration)
+@receiver([post_save, post_delete], sender=UserHeaderRegistration)
+def invalidate_structure_cache_on_registration_change(sender, instance, **kwargs):
+    """Đăng ký header đổi → cây menu của user liên quan cũng phải dựng lại."""
+    try:
+        invalidate_structure_cache()
+    except Exception as e:
+        logger.warning("Failed to invalidate header structure cache: %s", e)

@@ -251,6 +251,9 @@ config/
 | `CHANNEL_LAYERS`        | Redis cho WebSocket/Channels                              |
 | `CELERY_*`              | Celery config (broker, serializer, beat)                  |
 | `REST_FRAMEWORK`        | JWT auth, pagination, filtering, exception handler        |
+| `ENFORCE_HTTP_METHOD_POLICY` | Chặn PUT/PATCH/DELETE trên `/api/` (xem `libs/http_policy.py`) |
+| `INFO_DISPATCH_*`       | Dispatcher info: `INFO_DISPATCH_WRITE_ENABLED`, `INFO_DISPATCH_ALLOWED_POWERS` |
+| `INFO_STRUCTURE_CACHE_TTL` | TTL cache cây menu header theo user (giây, mặc định 300) |
 | `PASSWORD_MAX_AGE_DAYS` | Số ngày hết hạn mật khẩu (mặc định 90 ngày)               |
 | `OTP_*`                 | Cấu hình OTP cho quên/đặt lại mật khẩu                    |
 | `CORS_*`                | CORS config, whitelist origins                            |
@@ -351,14 +354,24 @@ GroupHeader (thanh tiêu đề)
     └── SystemHeader (sub-dropdown cấp 2, là Header/View thực tế)
 ```
 
-| Endpoint                          | Method | Mô tả                                           |
-| --------------------------------- | ------ | ----------------------------------------------- |
-| `/api/v1/info/headers/structure/` | GET    | Cây menu 3 cấp đầy đủ (Group → Pages → Headers) |
-| `/api/v1/info/group-headers/`     | GET    | Danh sách GroupHeader                           |
-| `/api/v1/info/page-headers/`      | GET    | Danh sách PagesHeader                           |
-| `/api/v1/info/system-headers/`    | GET    | Danh sách SystemHeader                          |
+| Endpoint                | Method | Mô tả                                                                     |
+| ----------------------- | ------ | ------------------------------------------------------------------------- |
+| `/api/v1/info/dispatch` | POST   | Dispatcher DUY NHẤT của app info: `{resource, action, id, data, params}`   |
 
-Cấu trúc response của `/headers/structure/`:
+Không còn PUT / PATCH / DELETE cho app `info` — mọi thao tác gom về 1 endpoint POST:
+
+| `resource`       | `action`                                             | Ý nghĩa                                            |
+| ---------------- | ---------------------------------------------------- | -------------------------------------------------- |
+| `headers`        | `structure`                                          | Cây menu 3 cấp (`params.scope=registered` \| `all`) |
+| `group_headers`  | `list`, `retrieve`                                   | Đọc GroupHeader (phân trang, lọc, tìm kiếm)         |
+| `group_headers`  | `create`, `update`, `delete`, `reorder`              | Ghi (cần quyền — xem `INFO_DISPATCH_*`)             |
+| `page_headers`   | như trên                                             | PagesHeader (lọc theo `group_header`)               |
+| `system_headers` | như trên                                             | SystemHeader (đọc bị lọc theo quyền T1)             |
+
+- Partial update thay cho PATCH: `{"action": "update", "id": 3, "data": {"partial": true, ...}}`.
+- Xoá trả **200 + envelope** (không dùng 204) để response luôn được mã hoá/parse đồng nhất.
+
+Cấu trúc response của `POST /api/v1/info/dispatch` với `{"resource": "headers", "action": "structure"}`:
 
 ```json
 {
@@ -532,30 +545,58 @@ no_content_response()                           # 204 No Content
 
 ---
 
+## Quy Ước HTTP Method (BẮT BUỘC)
+
+> **API chỉ dùng `GET`, `POST`, `OPTIONS`. KHÔNG dùng `PUT`, `PATCH`, `DELETE`.**
+
+| Mục đích              | Method | Ghi chú                                                        |
+| --------------------- | ------ | -------------------------------------------------------------- |
+| Đọc dữ liệu           | `GET`  | Query params; giữ nguyên semantics HTTP cache                  |
+| Ghi / thay đổi dữ liệu | `POST` | `create`, `update`, `delete`, `action`… đều qua POST            |
+| Preflight/CORS        | `OPTIONS` | Do CORS/DRF xử lý                                           |
+
+- Partial update (thay `PATCH`): gửi `"partial": true` trong body.
+- Xoá (thay `DELETE`): `POST` + `action: "delete"` hoặc `POST .../{id}/delete`; trả 200 + envelope (không dùng 204 vì `EncryptionMiddleware` bỏ qua response 204).
+- Endpoint ghi dạng CRUD: dùng `libs.routers.PostOnlyRouter` + `libs.viewsets.PostOnlyModelViewSet` — sinh `GET /resource`, `POST /resource`, `GET /resource/{id}`, `POST /resource/{id}/update`, `POST /resource/{id}/delete`.
+- Ghi nhiều thao tác nghiệp vụ trong 1 endpoint: theo pattern **dispatcher** (`POST /api/v1/systems/init_data`, `POST /api/v1/info/dispatch`) với `{resource, action, data, params}`.
+
+**3 lớp cưỡng chế** (defense in depth):
+
+| Lớp | Ở đâu | Hành vi |
+| --- | ----- | ------- |
+| 1 | `libs/middlewares/method_policy.py` (đăng ký trong `MIDDLEWARE`) | PUT/PATCH/DELETE trên `/api/` → **405** + envelope + header `Allow: GET, POST, OPTIONS` |
+| 2 | `http_method_names` của view + `libs/routers.py::PostOnlyRouter` | ViewSet không expose update/partial_update/destroy; router chỉ sinh route POST |
+| 3 | Proxy (`nginx` `limit_except`, Apache `<LimitExcept>`) | Chặn ngay tại proxy, không tới Django |
+
+FE tương ứng chỉ có `axios_get` / `axios_post` (xem `STD/src/axios/axios.jsx`) và có ESLint rule chặn `axios.put/patch/delete` (`STD/eslint.config.js`).
+
+Cấu hình: `ENFORCE_HTTP_METHOD_POLICY=True` (mặc định) — tắt chỉ khi thật sự cần tương thích ngược.
+
 ## Danh Sách API
 
 ### Authentication
 
-| Method | Endpoint                                 | Auth | Mô tả                           |
-| ------ | ---------------------------------------- | ---- | ------------------------------- |
-| POST   | `/api/v1/accounts/auth/register/`        | No   | Đăng ký                         |
-| POST   | `/api/v1/accounts/auth/login/`           | No   | Đăng nhập                       |
-| POST   | `/api/v1/accounts/auth/refresh/`         | No   | Refresh token                   |
-| POST   | `/api/v1/accounts/auth/logout/`          | Yes  | Đăng xuất                       |
-| GET    | `/api/v1/accounts/auth/me/`              | Yes  | Profile                         |
-| POST   | `/api/v1/accounts/auth/me/`              | Yes  | Cập nhật profile                |
-| POST   | `/api/v1/accounts/auth/change-password/` | Yes  | Đổi mật khẩu                    |
-| POST   | `/api/v1/accounts/auth/forgot-password/` | No   | Quên mật khẩu (gửi OTP)         |
-| POST   | `/api/v1/accounts/auth/reset-password/`  | No   | Đặt lại mật khẩu (xác minh OTP) |
+| Method | Endpoint                                | Auth | Mô tả                           |
+| ------ | --------------------------------------- | ---- | ------------------------------- |
+| POST   | `/api/v1/accounts/auth/register`        | No   | Đăng ký                         |
+| POST   | `/api/v1/accounts/auth/login`           | No   | Đăng nhập                       |
+| POST   | `/api/v1/accounts/auth/refresh`         | No   | Refresh token                   |
+| POST   | `/api/v1/accounts/auth/logout`          | Yes  | Đăng xuất                       |
+| GET    | `/api/v1/accounts/auth/me`              | Yes  | Profile                         |
+| POST   | `/api/v1/accounts/auth/me`              | Yes  | Cập nhật profile                |
+| POST   | `/api/v1/accounts/auth/change-password` | Yes  | Đổi mật khẩu                    |
+| POST   | `/api/v1/accounts/auth/forgot-password` | No   | Quên mật khẩu (gửi OTP)         |
+| POST   | `/api/v1/accounts/auth/reset-password`  | No   | Đặt lại mật khẩu (xác minh OTP) |
+
+> **Lưu ý:** `APPEND_SLASH=False` ⇒ API **KHÔNG có `/` ở cuối** (thêm `/` sẽ 404).
 
 ### Info / Menu Hệ Thống
 
-| Method | Endpoint                          | Auth | Mô tả                                    |
-| ------ | --------------------------------- | ---- | ---------------------------------------- |
-| GET    | `/api/v1/info/headers/structure/` | Yes  | Cây menu 3 cấp (Group → Pages → Headers) |
-| GET    | `/api/v1/info/group-headers/`     | Yes  | Danh sách Group                          |
-| GET    | `/api/v1/info/page-headers/`      | Yes  | Danh sách Pages                          |
-| GET    | `/api/v1/info/system-headers/`    | Yes  | Danh sách Headers                        |
+| Method | Endpoint                | Auth | Mô tả                                             |
+| ------ | ----------------------- | ---- | ------------------------------------------------- |
+| POST   | `/api/v1/info/dispatch` | Yes  | Dispatcher info: `{resource, action, id, data, params}` — đọc + ghi (ghi cần quyền) |
+
+Xem bảng `resource`/`action` chi tiết ở mục [`apps/info/`](#apps-info--menu-hệ-thống-header-3-cấp).
 
 ### Health Check
 
@@ -577,9 +618,9 @@ no_content_response()                           # 204 No Content
 
 | Method | Endpoint                 | Auth | Mô tả                                              |
 | ------ | ------------------------ | ---- | -------------------------------------------------- |
-| POST   | `/api/v1/face/register/` | Yes  | Đăng ký face embedding cho **chính user hiện tại** |
-| POST   | `/api/v1/face/search/`   | Yes  | Tìm kiếm user giống nhất với ảnh face (1:N)        |
-| POST   | `/api/v1/face/verify/`   | Yes  | Verify face khớp với user chỉ định (1:1)           |
+| POST   | `/api/v1/face/register`  | Yes  | Đăng ký face embedding cho **chính user hiện tại** |
+| POST   | `/api/v1/face/search`    | Yes  | Tìm kiếm user giống nhất với ảnh face (1:N)        |
+| POST   | `/api/v1/face/verify`    | Yes  | Verify face khớp với user chỉ định (1:1)           |
 
 **Lưu ý:**
 

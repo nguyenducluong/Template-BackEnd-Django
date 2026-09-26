@@ -20,6 +20,7 @@ help:
 	@echo "  make makemigrations - Alias for migrations"
 	@echo "  make shell         - Open Django shell"
 	@echo "  make test          - Run tests"
+	@echo "  make schema        - Xuất OpenAPI schema (schema.yaml) + validate"
 	@echo "  make run           - Run development server"
 	@echo "  make celery        - Run Celery worker"
 	@echo "  make beat          - Run Celery beat"
@@ -62,6 +63,13 @@ shell:
 
 test:
 	pytest
+
+# Xuất OpenAPI schema (Swagger) để kiểm tra tài liệu API.
+# BẮT BUỘC dùng -X utf8: schema có ký tự tiếng Việt/Hàn, console Windows mặc
+# định cp1252 sẽ crash (UnicodeEncodeError) khi in schema ra stdout.
+schema:
+	$(PYTHON) -X utf8 $(MANAGE) spectacular --file schema.yaml --validate
+	@echo "OpenAPI schema -> schema.yaml"
 
 run:
 	$(MANAGE) runserver 0.0.0.0:8000

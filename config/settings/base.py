@@ -56,6 +56,10 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    # Nén response (giảm băng thông cho payload lớn như cây menu/system details)
+    "django.middleware.gzip.GZipMiddleware",
+    # Chính sách POST-only: chặn PUT/PATCH/DELETE trên /api/ (libs/http_policy.py)
+    "libs.middlewares.method_policy.MethodPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -324,6 +328,8 @@ REST_FRAMEWORK = {
         "core": env("THROTTLE_CORE", default="60/min"),
         "ai": env("THROTTLE_AI", default="60/min"),
         "systems": env("THROTTLE_SYSTEMS", default="120/min"),
+        # App info (POST /api/v1/info/dispatch, cây menu hệ thống)
+        "info": env("THROTTLE_INFO", default="120/min"),
         "default": env("THROTTLE_DEFAULT", default="100/min"),
     },
     "DEFAULT_PAGINATION_CLASS": "libs.pagination.StandardPagination",
@@ -402,6 +408,24 @@ TRUSTED_PROXIES = env.list("TRUSTED_PROXIES", default=[])
 ACCOUNT_LOCKOUT_MAX_ATTEMPTS = env.int("ACCOUNT_LOCKOUT_MAX_ATTEMPTS", default=5)
 ACCOUNT_LOCKOUT_MINUTES = env.int("ACCOUNT_LOCKOUT_MINUTES", default=15)
 
+# ---------------------------------------------------------------------------
+# Chính sách HTTP method (POST-only) — xem libs/http_policy.py
+# ---------------------------------------------------------------------------
+# Lớp middleware chặn PUT/PATCH/DELETE trên /api/ (mặc định BẬT). Tắt chỉ khi
+# thật sự cần tương thích ngược (không khuyến khích).
+ENFORCE_HTTP_METHOD_POLICY = env.bool("ENFORCE_HTTP_METHOD_POLICY", default=True)
+
+# ---------------------------------------------------------------------------
+# Dispatcher info — POST /api/v1/info/dispatch (apps/info/dispatch.py)
+# ---------------------------------------------------------------------------
+# Đường GHI cấu hình header (create/update/delete/reorder) mặc định TẮT; chỉ bật
+# khi đã có màn hình quản trị và power tương ứng trong `_0033/_0039/_0040`.
+INFO_DISPATCH_WRITE_ENABLED = env.bool("INFO_DISPATCH_WRITE_ENABLED", default=False)
+# Danh sách power được phép ghi: SystemPower.id hoặc SystemPower.power_en.
+INFO_DISPATCH_ALLOWED_POWERS = env.list("INFO_DISPATCH_ALLOWED_POWERS", default=[])
+# TTL cache cây menu header theo (user, ngôn ngữ), đơn vị giây.
+INFO_STRUCTURE_CACHE_TTL = env.int("INFO_STRUCTURE_CACHE_TTL", default=300)
+
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:3000"])
 
@@ -424,6 +448,9 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Enterprise-grade Django API Server",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # Swagger UI: nút Authorize dùng scheme Bearer do libs/auth/schema.py khai báo
+    "SECURITY": [{"bearerAuth": []}],
+    "SORT_OPERATIONS": True,
     "COMPONENT_SPLIT_REQUEST": True,
     "SWAGGER_UI_SETTINGS": {
         "deepLinking": True,
