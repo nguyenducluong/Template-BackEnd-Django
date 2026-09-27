@@ -2,6 +2,14 @@ from django.db import models
 
 
 class Organization(models.Model):
+    class LevelChoices(models.IntegerChoices):
+        # Cay to chuc bat dau tu COMPANY (0) o goc, cac cap con lap tang danh.
+        COMPANY = 0, "Company"
+        TEAM = 1, "Team"
+        GROUP = 2, "Group"
+        PART = 3, "Part"
+        LOCATION = 4, "Location"
+
     id = models.BigAutoField(primary_key=True)
 
     # Khóa ngoại tự tham chiếu (Self-referential Foreign Key)
@@ -16,13 +24,8 @@ class Organization(models.Model):
 
     name = models.CharField(max_length=100)
     level = models.PositiveSmallIntegerField(
-        choices=[
-            (0, "Team"),
-            (1, "Group"),
-            (2, "Part"),
-            (3, "Location"),
-        ],
-        default=0,
+        choices=LevelChoices.choices,
+        default=LevelChoices.COMPANY,
     )
     sort = models.IntegerField(default=0)
     is_use = models.BooleanField(default=False)

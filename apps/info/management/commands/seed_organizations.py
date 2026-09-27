@@ -2,6 +2,9 @@ from django.core.management.base import BaseCommand
 
 from apps.info.models import Material, Organization, Shift, Vendor
 
+# LevelChoices lay truc tiep tu model de seed dung chung choices voi DB
+LevelChoices = Organization.LevelChoices
+
 
 class Command(BaseCommand):
     help = "Seed all info data (Organization, Shift, Vendor, Material)"
@@ -14,40 +17,42 @@ class Command(BaseCommand):
         )
 
     def _seed_organizations(self):
+        # id, parent_id, name, level, sort, is_use
+        # level dung Organization.LevelChoices:
+        #   0 Company - 1 Team - 2 Group - 3 Part - 4 Location
         data = [
-            # id, parent_id, name, sort, is_use
-            (1, None, "SEVT", 1, True),
-            (2, 1, "SET QC Team", 1, True),
-            (3, 2, "IQC G", 1, True),
-            (4, 3, "IQC 1P", 1, True),
-            (5, 3, "IQC 2P", 2, True),
-            (6, 3, "IQC 3P", 3, True),
-            (11, 4, "System", 1, True),
-            (12, 4, "CKD / SKD", 2, True),
-            (13, 4, "Semi", 3, True),
-            (14, 4, "Reliability (DTC)", 4, True),
-            (15, 4, "Inno MEC", 5, True),
-            (21, 5, "Inno MEC", 1, True),
-            (22, 5, "Incoming MEC", 2, True),
-            (23, 5, "Trouble MEC", 3, True),
-            (24, 5, "RMA MEC", 4, True),
-            (25, 5, "New Model", 5, True),
-            (31, 6, "Inno ELE", 1, True),
-            (32, 6, "Incoming ELE", 2, True),
-            (33, 6, "Trouble ELE", 3, True),
-            (34, 6, "RMA ELE", 4, True),
+            (1, None, "SEVT", LevelChoices.COMPANY, 1, True),
+            (2, 1, "SET QC Team", LevelChoices.TEAM, 1, True),
+            (3, 2, "IQC G", LevelChoices.TEAM, 1, True),
+            (4, 3, "IQC 1P", LevelChoices.GROUP, 1, True),
+            (5, 3, "IQC 2P", LevelChoices.GROUP, 2, True),
+            (6, 3, "IQC 3P", LevelChoices.GROUP, 3, True),
+            (11, 4, "System", LevelChoices.PART, 1, True),
+            (12, 4, "CKD / SKD", LevelChoices.PART, 2, True),
+            (13, 4, "Semi", LevelChoices.PART, 3, True),
+            (14, 4, "Reliability (DTC)", LevelChoices.PART, 4, True),
+            (15, 4, "Inno MEC", LevelChoices.PART, 5, True),
+            (21, 5, "Inno MEC", LevelChoices.LOCATION, 1, True),
+            (22, 5, "Incoming MEC", LevelChoices.LOCATION, 2, True),
+            (23, 5, "Trouble MEC", LevelChoices.LOCATION, 3, True),
+            (24, 5, "RMA MEC", LevelChoices.LOCATION, 4, True),
+            (25, 5, "New Model", LevelChoices.LOCATION, 5, True),
+            (31, 6, "Inno ELE", LevelChoices.LOCATION, 1, True),
+            (32, 6, "Incoming ELE", LevelChoices.LOCATION, 2, True),
+            (33, 6, "Trouble ELE", LevelChoices.LOCATION, 3, True),
+            (34, 6, "RMA ELE", LevelChoices.LOCATION, 4, True),
         ]
-        for org_id, pid, name, sort, is_use in data:
+        for org_id, pid, name, level, sort, is_use in data:
             Organization.objects.update_or_create(
                 id=org_id,
                 defaults={
                     "name": name,
+                    "level": level,
                     "sort": sort,
                     "is_use": is_use,
                     "parent_id": pid,
                 },
             )
-
     def _seed_shifts(self):
         data = [
             (1, "Hành chính", "Staff A1", "Staff A1"),

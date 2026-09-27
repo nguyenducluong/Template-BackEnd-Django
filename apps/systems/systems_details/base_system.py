@@ -322,6 +322,111 @@ def details(request, header, params=None):
 # ---------------------------------------------------------------------------
 # Dialog actions — SUBMIT_FORM
 # ---------------------------------------------------------------------------
+# Quy tắc validate 1 field — nguồn sự thật là `config.dialogs.<id>.sections[].fields[].options.validate`
+# của payload (không tin client gửi lên). FE dùng ĐÚNG bộ quy tắc này để validate tức thì,
+# nên thêm rule mới phải thêm cả 2 phía (xem `STD/.../dialogFieldValidate.jsx`).
+#   required     : bắt buộc có giá trị
+#   min_length   : độ dài chuỗi tối thiểu
+#   max_length   : độ dài chuỗi tối đa
+#   pattern      : regex (áp dụng trên str, dùng fullmatch)
+#   min / max    : khoảng số (áp dụng khi ép được sang float)
+_VALIDATE_RULES = ("required", "min_length", "max_length", "pattern", "min", "max")
+
+
+def _is_empty(value):
+    """Giá trị 'rỗng' theo góc nhìn validate (checkbox false thì KHÔNG rỗng)."""
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (str, list, tuple, dict, set)):
+        return len(value) == 0
+    return False
+
+
+def validate_field_values(dialog_cfg, values):
+    """Validate ``values`` theo rule của từng field trong ``dialog_cfg``.
+
+    Trả về ``errors`` dạng ``{field_key: [message]}`` — đúng shape mà FE đọc
+    ở ``current.field_errors[key]`` để highlight ô nhập.
+
+    Chỉ kiểm tra field CÓ khai báo ``options.key``; field thiếu ``key`` (config cũ)
+    thì bỏ qua — người dùng vẫn được validate qua ``action.validate.required``.
+    """
+    errors = {}
+    for section in ((dialog_cfg or {}).get("sections") or []):
+        # Section BẢNG (type="table") — validate theo SỐ DÒNG đã chọn, không phải field.
+        # Đổi với FE `validate_table_section` trong dialogFieldValidate.jsx.
+        if section.get("type") == "table":
+            selected_key = (section.get("config") or {}).get("selected_key")
+            # Không khai selected_key ⇒ bảng chỉ để xem, không validate
+            if not selected_key:
+                continue
+            rules = section.get("validate") or {}
+            selected = (values or {}).get(selected_key)
+            count = len(selected) if isinstance(selected, (list, tuple, set)) else 0
+            if rules.get("min_selected") and count < int(rules["min_selected"]):
+                errors[selected_key] = [
+                    _("Please select at least %(n)s row(s).") % {"n": rules["min_selected"]}
+                ]
+            if rules.get("max_selected") and count > int(rules["max_selected"]):
+                errors[selected_key] = [
+                    _("You may select at most %(n)s row(s).") % {"n": rules["max_selected"]}
+                ]
+            continue
+
+        if section.get("show") is False:
+            continue
+        for field in (section.get("fields") or []):
+            options = field.get("options") or {}
+            field_key = options.get("key")
+            if not field_key:
+                continue
+            rules = options.get("validate") or {}
+            if not rules:
+                continue
+
+            value = (values or {}).get(field_key)
+            label = (field.get("title") or {}).get("text") or field_key
+            is_empty = _is_empty(value)
+
+            # required: field rỗng → KHÔNG chạy tiếp các rule còn lại (tránh báo lỗi kép)
+            if rules.get("required") and is_empty:
+                errors[field_key] = [_("%(label)s is required.") % {"label": label}]
+                continue
+            if is_empty:
+                # Không bắt buộc + rỗng → các rule độ dài/pattern không có ý nghĩa
+                continue
+
+            messages = []
+            if isinstance(value, str):
+                if rules.get("min_length") and len(value) < int(rules["min_length"]):
+                    messages.append(_("Must be at least %(n)s characters.") % {"n": rules["min_length"]})
+                if rules.get("max_length") and len(value) > int(rules["max_length"]):
+                    messages.append(_("Must be at most %(n)s characters.") % {"n": rules["max_length"]})
+                if rules.get("pattern"):
+                    import re
+
+                    if re.match(str(rules["pattern"]), value) is None:
+                        messages.append(_("Invalid format."))
+
+            # min/max: chỉ áp dụng khi ép được sang số (bỏ qua giá trị không phải số)
+            if rules.get("min") is not None or rules.get("max") is not None:
+                try:
+                    numeric = float(value)
+                except (TypeError, ValueError):
+                    numeric = None
+                if numeric is not None:
+                    if rules.get("min") is not None and numeric < float(rules["min"]):
+                        messages.append(_("Must be greater than or equal to %(n)s.") % {"n": rules["min"]})
+                    if rules.get("max") is not None and numeric > float(rules["max"]):
+                        messages.append(_("Must be less than or equal to %(n)s.") % {"n": rules["max"]})
+
+            if messages:
+                errors[field_key] = messages
+    return errors
+
+
 def _collect_files(request, params):
     """Ghép file upload (multipart) ↔ metadata FE gửi trong ``params.files``.
 
@@ -463,11 +568,15 @@ def submit_form(request, header, params=None):
     # 4. Field bắt buộc theo config của action
     values = params.get("values") or {}
     required_keys = ((action_cfg or {}).get("validate") or {}).get("required") or []
-    missing = [key for key in required_keys if values.get(key) in (None, "", [], {})]
+    missing = [key for key in required_keys if _is_empty(values.get(key))]
     if missing:
         errors["values"] = [
             _("Missing required field(s): %(fields)s.") % {"fields": ", ".join(missing)}
         ]
+    # 4b. Rule chi tiết theo từng field (`sections[].fields[].options.validate`):
+    # độ dài / pattern / khoảng số — client KHÔNG được tự quyết định.
+    if dialog_cfg and not errors.get("values"):
+        errors.update(validate_field_values(dialog_cfg, values))
 
     # 5. Giới hạn dung lượng file — tổng size lấy từ FILE SERVER NHẬN ĐƯỢC
     # (xem _collect_files), không dùng số client khai trong params.files.

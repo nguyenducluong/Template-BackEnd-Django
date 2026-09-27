@@ -1,14 +1,14 @@
 """
 Seed toàn bộ dữ liệu mẫu theo các file SQL trong `database/mysql/iqcg/`:
 
-- `_0002 organizations.sql`    -> Organization (cây 3 cấp + level)
+- `_0002 organizations.sql`    -> Organization (Company > Team > Group > Part > Location)
 - `_0006_shift.sql`            -> Shift
 - `_0020-21_vendor,material`   -> Vendor / Material (data example)
 - `_0030-33_header.sql`        -> GroupHeader / PagesHeader / SystemHeader / SystemPower
 - `_0010_user.sql`             -> User mẫu (Nguyễn Đức Lương)
-- `_0035~38 public system.sql` -> HeaderRegistration + hiệu ứng trigger vào
-                                  HeaderOrganization / UserHeaderRegistration,
-                                  và SystemPermission example
+- `_0035~40 public system.sql` -> HeaderRegistration cho MOI SystemHeader
+                                  + hieu ung trigger vao HeaderOrganization / UserHeaderRegistration,
+                                  va SystemPermission example
 """
 
 from django.core.management.base import BaseCommand
@@ -43,29 +43,32 @@ class Command(BaseCommand):
         )
 
     # ------------------------------------------------------------------
-    # _0002 organizations.sql
+    # - `_0002 organizations.sql`    -> Organization (Company > Team > Group > Part > Location)
     # ------------------------------------------------------------------
+    # id, parent_id, level, name, sort, is_use
+    # level dung Organization.LevelChoices:
+    #   0 Company - 1 Team - 2 Group - 3 Part - 4 Location
     ORGS = [
-        # id, parent_id, level, name, sort, is_use
-        (1, None, 0, "SET QC Team", 1, True),
-        (2, 1, 1, "IQC G", 1, True),
-        (3, 2, 2, "IQC 1P", 1, True),
-        (4, 2, 2, "IQC 2P", 2, True),
-        (5, 2, 2, "IQC 3P", 3, True),
-        (11, 3, 3, "System", 1, True),
-        (12, 3, 3, "CKD / SKD", 2, True),
-        (13, 3, 3, "Semi", 3, True),
-        (14, 3, 3, "Reliability (DTC)", 4, True),
-        (15, 3, 3, "Inno MEC", 5, True),
-        (21, 4, 3, "Inno MEC", 1, True),
-        (22, 4, 3, "Incoming MEC", 2, True),
-        (23, 4, 3, "Trouble MEC", 3, True),
-        (24, 4, 3, "RMA MEC", 4, True),
-        (25, 4, 3, "New Model", 5, True),
-        (31, 5, 3, "Inno ELE", 1, True),
-        (32, 5, 3, "Incoming ELE", 2, True),
-        (33, 5, 3, "Trouble ELE", 3, True),
-        (34, 5, 3, "RMA ELE", 4, True),
+        (1, None, 0, "SEVT", 1, True),
+        (2, 1, 1, "SET QC Team", 1, True),
+        (3, 2, 2, "IQC G", 1, True),
+        (4, 3, 3, "IQC 1P", 1, True),
+        (5, 3, 3, "IQC 2P", 2, True),
+        (6, 3, 3, "IQC 3P", 3, True),
+        (11, 4, 4, "System", 1, True),
+        (12, 4, 4, "CKD / SKD", 2, True),
+        (13, 4, 4, "Semi", 3, True),
+        (14, 4, 4, "Reliability (DTC)", 4, True),
+        (15, 4, 4, "Inno MEC", 5, True),
+        (21, 5, 4, "Inno MEC", 1, True),
+        (22, 5, 4, "Incoming MEC", 2, True),
+        (23, 5, 4, "Trouble MEC", 3, True),
+        (24, 5, 4, "RMA MEC", 4, True),
+        (25, 5, 4, "New Model", 5, True),
+        (31, 6, 4, "Inno ELE", 1, True),
+        (32, 6, 4, "Incoming ELE", 2, True),
+        (33, 6, 4, "Trouble ELE", 3, True),
+        (34, 6, 4, "RMA ELE", 4, True),
     ]
 
     def _seed_organizations(self):
@@ -261,77 +264,91 @@ class Command(BaseCommand):
         return user
 
     # ------------------------------------------------------------------
-    # _0035~38 public system.sql
+    # _0035~40 public system.sql - HeaderRegistration cho moi SystemHeader
     # ------------------------------------------------------------------
     def _seed_registrations(self, user):
-        # _0035: Header System cho bộ phận System (org 22 -> header 1)
-        hr, _ = HeaderRegistration.objects.update_or_create(
-            org_id=22,
-            header_id=1,
-            defaults={
-                "registered_by": user,
-                "approved_by": user,
-                "type": HeaderRegistration.TypeChoices.NO_REGISTRATION,  # 1
-                "status": HeaderRegistration.StatusChoices.APPROVED,  # 1
-            },
-        )
+        # Bo phan mac dinh: org 22 = 'Incoming MEC' (nhom IQC 2P)
+        org_id = 22
+        # Lay TAT CA SystemHeader da seed (khong hardcode id) de moi header deu co
+        # mot dang ky HeaderRegistration hop le - tranh tinh trang header khong
+        # duoc gan quyen va khong mo duoc man hinh.
+        headers = list(SystemHeader.objects.all().order_by("sort", "id"))
+        if not headers:
+            self.stdout.write(self.style.WARNING("  No SystemHeader found - skip registrations"))
+            return
 
-        # Trigger trg_after_insert_0035 -> _0037
-        ho, _ = HeaderOrganization.objects.update_or_create(
-            org_id=22,
-            header_registration=hr,
-            defaults={
-                "registered_by": user,
-                "approved_by": user,
-                "type": HeaderRegistration.TypeChoices.NO_REGISTRATION,  # 1
-                "is_selected": True,  # 1
-                "status": hr.status,
-            },
-        )
+        registrations = []
+        for header in headers:
+            # _0035: dang ky header cho bo phan
+            hr, _ = HeaderRegistration.objects.update_or_create(
+                org_id=org_id,
+                header_id=header.id,
+                defaults={
+                    "registered_by": user,
+                    "approved_by": user,
+                    "type": HeaderRegistration.TypeChoices.NO_REGISTRATION,
+                    "status": HeaderRegistration.StatusChoices.APPROVED,
+                },
+            )
+            registrations.append(hr)
 
-        # _0036: User Nguyễn Đức Lương đăng ký header System
-        UserHeaderRegistration.objects.update_or_create(
-            registered_by=user,
-            header_registration=hr,
-            defaults={
-                "approved_by": user,
-                "status": HeaderRegistration.StatusChoices.APPROVED,
-            },
-        )
+            # Trigger trg_after_insert_0035 -> _0037 (header ap dung cho bo phan)
+            ho, _ = HeaderOrganization.objects.update_or_create(
+                org_id=org_id,
+                header_registration=hr,
+                defaults={
+                    "registered_by": user,
+                    "approved_by": user,
+                    "type": HeaderRegistration.TypeChoices.NO_REGISTRATION,
+                    "is_selected": True,
+                    "status": hr.status,
+                },
+            )
 
-        # _0038: đăng ký header organization cho user (is_selected=1)
-        HeaderOrganizationUserRegistration.objects.update_or_create(
-            registered_by=user,
-            header_organization=ho,
-            defaults={
-                "approved_by": user,
-                "is_selected": True,
-                "status": HeaderRegistration.StatusChoices.APPROVED,
-            },
-        )
+            # _0036: user dang ky header
+            UserHeaderRegistration.objects.update_or_create(
+                registered_by=user,
+                header_registration=hr,
+                defaults={
+                    "approved_by": user,
+                    "status": HeaderRegistration.StatusChoices.APPROVED,
+                },
+            )
 
-        # _0039 + _0040: quyền hệ thống example (power 'Save memo SQCI')
-        perm, _ = SystemPermission.objects.update_or_create(
-            org_id=22,
-            power_id=1,
-            defaults={
-                "registered_by": user,
-                "approved_by": user,
-                "type": HeaderRegistration.TypeChoices.NO_REGISTRATION,
-                "status": HeaderRegistration.StatusChoices.APPROVED,
-            },
-        )
-        UserSystemPermissionRegistration.objects.update_or_create(
-            registered_by=user,
-            system_permission=perm,
-            defaults={
-                "approved_by": user,
-                "status": HeaderRegistration.StatusChoices.APPROVED,
-            },
-        )
+            # _0038: user chon header organization nay
+            HeaderOrganizationUserRegistration.objects.update_or_create(
+                registered_by=user,
+                header_organization=ho,
+                defaults={
+                    "approved_by": user,
+                    "is_selected": True,
+                    "status": HeaderRegistration.StatusChoices.APPROVED,
+                },
+            )
 
+        # _0039 + _0040: quyen he thong cho tung SystemHeader co power
+        for header in headers:
+            for power in SystemPower.objects.filter(system_header_id=header.id).order_by("sort", "id"):
+                perm, _ = SystemPermission.objects.update_or_create(
+                    org_id=org_id,
+                    power_id=power.id,
+                    defaults={
+                        "registered_by": user,
+                        "approved_by": user,
+                        "type": HeaderRegistration.TypeChoices.NO_REGISTRATION,
+                        "status": HeaderRegistration.StatusChoices.APPROVED,
+                    },
+                )
+                UserSystemPermissionRegistration.objects.update_or_create(
+                    registered_by=user,
+                    system_permission=perm,
+                    defaults={
+                        "approved_by": user,
+                        "status": HeaderRegistration.StatusChoices.APPROVED,
+                    },
+                )
 
-    # ------------------------------------------------------------------
+        self.stdout.write(f"  Registered {len(registrations)} header(s) for org {org_id}")
 
     def handle(self, *args, **options):
         if options["clean"]:

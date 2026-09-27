@@ -153,23 +153,29 @@ DETAILS = {
 				"header": {"label": "@dialog.dlg_input_system.header.label", "minimize": True, "maximize": True, "close": True},
 				"sections": [
 					{
-       			"key": "info_section",
+						"key": "info_section",
 						"type": "column",
 						"show": True,
 						"label": "@dialog.dlg_input_system.sections.0.label",
 						"columns": 4,
+						# Mỗi field BẮT BUỘC có `key`:
+						#  - là khoá lưu giá trị trong `current.dialog_values` (gửi lên BE ở `values`)
+						#  - là khoá FE dùng để tra lỗi validate (`current.field_errors[key]`)
+						#  - là khoá BE dùng khi validate lại (không tin client)
+						# Nếu thiếu `key`, FE fallback sang `title.text` → field trùng tên sẽ đè giá trị lên nhau.
 						"fields": [
-							{"title": {"text": "Team", "required": True, "key" : "team_id"}, "options": {"type": "tree", "width": 1}},
-							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 1}},
-							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 1}},
-							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 1}},
-							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 2}},
-							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 2}},
-							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 2, "height": 4}},
-							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 2}},
-							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 2}},
-							{"title": {"text": "Vendor Sorting", "required": True, "key" : ""}, "options": {"type": "input", "width": 2}},
-							{"title": {"text": "Vendor SortingVendor SortingVendor SortingVendor Sorting", "required": True}, "options": {"type": "input", "width": 2}},
+							{"title": {"text": "Team", "required": True}, "options": {"key": "team", "type": "tree", "width": 1, "validate": {"required": True}}},
+							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "vendor_code", "type": "input", "width": 1, "placeholder": "VD: DK18", "validate": {"required": True, "min_length": 2, "max_length": 8, "pattern": "^[A-Za-z0-9-]+$"}}},
+							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "vendor_name", "type": "input", "width": 1, "placeholder": "VD: DAE RIM", "validate": {"required": True, "max_length": 50}}},
+							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "vendor_short", "type": "input", "width": 1, "placeholder": "Tên ngắn (không bắt buộc)", "validate": {"max_length": 20}}},
+							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "inspection_date", "type": "date", "width": 2, "validate": {"required": True}}},
+							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "lot_no", "type": "input", "width": 2, "placeholder": "VD: LOT-2025-0001", "validate": {"required": True, "min_length": 4, "max_length": 20}}},
+							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "defect_qty", "type": "number", "width": 2, "validate": {"required": True, "min": 0, "max": 9999}}},
+							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "result_status", "type": "select", "width": 2, "options": [{"value": "", "title": "— Chọn —"}, {"value": "pass", "title": "Đạt"}, {"value": "fail", "title": "Không đạt"}], "validate": {"required": True}}},
+							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "qc_team", "type": "select", "width": 2, "options": [{"value": "iqc_g", "title": "IQC G"}, {"value": "iqc_2p", "title": "IQC 2P"}, {"value": "oqc", "title": "OQC"}], "validate": {}}},
+							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "shift", "type": "radio", "width": 2, "options": [{"value": 1, "title": "Hành chính"}, {"value": 2, "title": "Ca 1"}, {"value": 3, "title": "Ca 2"}], "validate": {}}},
+							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "is_urgent", "type": "checkbox", "width": 2, "validate": {}}},
+							{"title": {"text": "Vendor SortingVendor SortingVendor SortingVendor Sorting", "required": True}, "options": {"key": "remark", "type": "input", "width": 2, "height": 4, "multiline": True, "validate": {"max_length": 200}}},
 						],
 					},
 					{
@@ -184,6 +190,43 @@ DETAILS = {
 							"text/*": [".txt", ".csv", ".md", ".json", ".xml", ".html", ".css", ".js"],
 							"application/*": [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".xlsm", ".ppt", ".pptx"],
 						},
+					},
+					# ────────────────────────────────────────────────────
+					# SECTION 3: BẢNG (type = table)
+					# FE render bằng DetailsDialogTable: đọc `col_keys` / `headers`, chọn nhiều dòng.
+					# data_source: 'static' = đọc thừ data.table[data_key] trong payload (mừc độ để demo)
+					#            'search' = dành cho luộng gọi dispatcher để lấy dữ liệu theo tham số
+					# selected_key: khoá lưu DANH SÁCH id dòng đã chọn → coi như một field trong values,
+					# đển nguyên qua SUBMIT_FORM (không cần sửa dialogActionRegistry)
+					{
+						"key": "detail_table_section",
+						"type": "table",
+						"show": True,
+						"label": "@dialog.dlg_input_system.sections.2.label",
+						"config": {
+							"data_source": "static",
+							"data_key": "dialog_item_rows",
+							"selectable": True,
+							"selected_key": "selected_item_ids",
+							"max_height": 200,
+							"col_keys": [
+								{"col_w": 50, "key": None},
+								{"col_w": 120, "key": "code", "align": "center"},
+								{"col_w": 260, "key": "name"},
+								{"col_w": 110, "key": "unit", "align": "center"},
+								{"col_w": 100, "key": "qty", "align": "right"},
+								{"col_w": 110, "key": "status", "align": "center"},
+							],
+							"headers": [
+								{"title": "STT"},
+								{"title": "@dialog.dlg_input_system.sections.2.headers.code"},
+								{"title": "@dialog.dlg_input_system.sections.2.headers.name"},
+								{"title": "@dialog.dlg_input_system.sections.2.headers.unit"},
+								{"title": "@dialog.dlg_input_system.sections.2.headers.qty"},
+								{"title": "@dialog.dlg_input_system.sections.2.headers.status"},
+							],
+						},
+						"validate": {"min_selected": 1, "max_selected": 3},
 					},
 				],
 				"actions": [
@@ -205,10 +248,12 @@ DETAILS = {
 						"action_id": "dlg_input_system.save",
 						# None: header này chưa có SystemPower trong seed → chỉ cần quyền header (T1)
 						"power_key": None,
-						# Giá trị mặc định nạp vào form khi mở dialog
-						"defaults": {},
-						# Field bắt buộc: FE chặn trước, BE validate lại (không tin client)
-						"validate": {"required": []},
+						# Giá trị mặc định nạp vào form khi mở dialog (khoá = `options.key` của field)
+						"defaults": {"qc_team": "iqc_g", "result_status": "pass", "shift": 1},
+						# Field bắt buộc: FE chặn trước, BE validate lại (không tin client).
+						# Nên trùng với `fields[].options.validate.required`: validate ở action chặn submit,
+						# còn `validate.required` ở field dùng để validate ngay khi người dùng nhập.
+						"validate": {"required": ["team", "vendor_code", "vendor_name", "inspection_date", "lot_no", "defect_qty", "result_status"]},
 						# Hành vi sau khi submit thành công
 						"on_success": {"refresh": "data", "close_dialog": False, "remove_history": False},
 						"confirmation": {
@@ -294,7 +339,19 @@ DETAILS = {
 				{"label": "@table.kpi_summary.fail", "value": 19, "color": "error.main"},
 				{"label": "@table.kpi_summary.lot_reject_rate", "value": "1.55%", "trend": "down"},
 			],
-			# ═══ kpi_table_data → layout type: table_kpi (row → subGroups[] → details[]) ═══
+			# ═══ dialog_item_rows → section type=table trong dialog (data_source=static)
+		# ═══ id để cấn cho cốt chọn nhiều dòng (dialog_values['selected_item_ids'])
+		"dialog_item_rows": [
+			{"id": 1, "code": "ITM-001", "name": "Connector 20P", "unit": "PCS", "qty": 1200, "status": "active"},
+			{"id": 2, "code": "ITM-002", "name": "Housing 12V", "unit": "PCS", "qty": 850, "status": "active"},
+			{"id": 3, "code": "ITM-003", "name": "Terminal Block", "unit": "PCS", "qty": 430, "status": "inactive"},
+			{"id": 4, "code": "ITM-004", "name": "Cable Shield 200mm", "unit": "M", "qty": 2760, "status": "active"},
+			{"id": 5, "code": "ITM-005", "name": "Fuse 5A", "unit": "PCS", "qty": 320, "status": "inactive"},
+			{"id": 6, "code": "ITM-006", "name": "Bracket Left", "unit": "PCS", "qty": 640, "status": "active"},
+			{"id": 7, "code": "ITM-007", "name": "Bracket Right", "unit": "PCS", "qty": 640, "status": "active"},
+			{"id": 8, "code": "ITM-008", "name": "Gasket Rubber", "unit": "PCS", "qty": 158, "status": "inactive"},
+		],
+		# ═══ kpi_table_data → layout type: table_kpi (row → subGroups[] → details[]) ═══
 			"kpi_table_data": [
 				{
 					"stt": 1, "col1": "Incoming Lot - Mô hình QC", "col2": "Tổng cộng", "col4": "Tổng hợp",
