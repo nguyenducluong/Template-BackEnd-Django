@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from libs.ai.ollama_client import OllamaClient
 
-from .tools.registry import ALLOWED_TOOL_NAMES, execute_tool, list_tools_schemas
+from .tools.registry import execute_tool
 
 logger = logging.getLogger("apps")
 
@@ -63,7 +63,15 @@ class ToolAgent:
     def run(self, messages: List[Dict[str, str]], user=None) -> str:
         """Chạy vòng lặp tool. Trả về text phản hồi cuối cùng."""
         messages = [dict(m) for m in messages]
-        tool_prompt = NATIVE_TOOL_PROMPT if self.use_native_tools else self._json_prompt()
+
+        # Lọc tool theo QUYỀN của user TRƯỚC khi đưa cho model. Nếu không lọc:
+        # model vẫn thấy tên + sơ đồ của mọi tool → lộ tool ngoài phạm vi và tốn
+        # lượt gọi cho các tool chắc chắn trả "không có quyền".
+        # `execute_tool` vẫn kiểm tra quyền lần nữa khi thực thi → fail-closed.
+        allowed = self._allowed_specs(user)
+        allowed_names = {spec.name for spec in allowed}
+
+        tool_prompt = NATIVE_TOOL_PROMPT if self.use_native_tools else self._json_prompt(allowed)
 
         has_sys = any(m.get("role") == "system" for m in messages)
         if not has_sys:
@@ -75,7 +83,7 @@ class ToolAgent:
                     break
 
         for _ in range(self.max_turns):
-            tools = list_tools_schemas() if self.use_native_tools else None
+            tools = [spec.to_ollama_tool() for spec in allowed] if self.use_native_tools else None
             response = self.client.chat(messages, tools=tools)
             reply = response.get("message", {})
             content = reply.get("content", "") or ""
@@ -92,7 +100,7 @@ class ToolAgent:
 
             # 2) JSON fallback
             if not self.use_native_tools:
-                call = self._parse_json_call(content)
+                call = self._parse_json_call(content, allowed_names)
                 if call is not None:
                     self._execute_and_collect(messages, user, call["tool"], call["args"])
                     continue
@@ -113,36 +121,57 @@ class ToolAgent:
         logger.info("Agent tool called: %s by user=%s", name, getattr(user, "id", None))
 
     # ------------------------------------------------------------------
-    def _json_prompt(self) -> str:
-        from .tools.registry import TOOLS
+    @staticmethod
+    def _allowed_specs(user) -> list:
+        """Tool mà user ĐƯỢC gọi — lọc qua AIMCPService (nguồn duy nhất về quyền)."""
+        from .services import get_ai_mcp_service
 
+        return get_ai_mcp_service().list_tools(user)
+
+    @staticmethod
+    def _json_prompt(allowed: list) -> str:
         lines = []
-        for name in sorted(ALLOWED_TOOL_NAMES):
-            spec = TOOLS[name]
+        for spec in sorted(allowed, key=lambda s: s.name):
             params = json.dumps(spec.input_schema, ensure_ascii=False)
-            lines.append(f"- {name}: {spec.description} | args_schema={params}")
+            lines.append(f"- {spec.name}: {spec.description} | args_schema={params}")
+        # Không có tool nào được quyền → nói rõ để model trả lời tự nhiên thay vì
+        # bịa tên tool.
+        if not lines:
+            return JSON_TOOL_PROMPT.format(tools="- (không có công cụ nào khả dụng)")
         return JSON_TOOL_PROMPT.format(tools="\n".join(lines))
 
     @staticmethod
-    def _parse_json_call(content: str) -> Optional[Dict[str, Any]]:
-        """Trích JSON {"tool":..., "args":...} từ text model (bỏ wrapper ```json)."""
-        text = content.strip()
-        text = text.strip("`")
-        if text.lower().startswith("json"):
-            text = text[4:].strip()
-        try:
-            data = json.loads(text)
-        except (ValueError, TypeError):
-            start = content.find("{")
-            end = content.rfind("}")
-            if start == -1 or end == -1 or end <= start:
-                return None
+    def _parse_json_call(content: str, allowed_names: set) -> Optional[Dict[str, Any]]:
+        """Trích JSON {"tool":..., "args":...} từ text của model.
+
+        Model hay trả lẫn JSON với văn xuôi ("Here's the request: ```json {...}```"),
+        thậm chí có nhiều khối JSON trong một câu. Cách cũ cắt từ `{` ĐẦU TIÊN tới
+        `}` CUỐI CÙNG nên gộp cả các khối lại thành chuỗi hỏng -> luôn None ->
+        agent trả nguyên văn bản thô cho người dùng thay vì gọi tool.
+
+        Nay dùng `raw_decode` thử lần lượt TỪNG vị trí `{`: khối JSON hợp lệ đầu
+        tiên sẽ được lấy đúng, kể cả khi có khối khác nằm trước/sau.
+        """
+        text = (content or "").strip()
+
+        data = None
+        decoder = json.JSONDecoder()
+        index = text.find("{")
+        while index != -1:
             try:
-                data = json.loads(content[start:end + 1])
-            except (ValueError, TypeError):
-                return None
+                candidate, _ = decoder.raw_decode(text, index)
+            except ValueError:
+                candidate = None
+            if isinstance(candidate, dict) and "tool" in candidate:
+                data = candidate
+                break
+            index = text.find("{", index + 1)
+
+        if data is None:
+            return None
         if not isinstance(data, dict) or "tool" not in data:
             return None
-        if data["tool"] not in ALLOWED_TOOL_NAMES:
+        # Chỉ chấp nhận tool user được phép (chặn model bịa / gọi tool ngoài quyền)
+        if data["tool"] not in allowed_names:
             return None
         return {"tool": data["tool"], "args": data.get("args", {})}

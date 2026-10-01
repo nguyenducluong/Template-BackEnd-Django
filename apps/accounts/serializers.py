@@ -2,7 +2,7 @@ from django.utils.translation import gettext as _
 from rest_framework import serializers
 
 from .models import User
-from libs.auth.jwt_utils import verify_refresh_token
+from libs.auth.jwt_utils import rotate_refresh_token
 
 
 class LoginSerializer(serializers.Serializer):
@@ -88,10 +88,12 @@ class TokenRefreshSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         try:
-            user = verify_refresh_token(attrs["refresh"])
+            access, refresh, user = rotate_refresh_token(attrs["refresh"])
         except Exception:
             raise serializers.ValidationError(_("Invalid or expired refresh token"))
         attrs["user"] = user
+        attrs["access"] = access
+        attrs["refresh"] = refresh
         return attrs
 
 

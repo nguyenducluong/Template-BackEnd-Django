@@ -207,9 +207,51 @@ def is_token_blacklisted(jti: str) -> bool:
     return False
 
 
+def blacklisted_within_grace(jti: str, grace_seconds: int) -> bool:
+    """Token này bị blacklist trong khoảng ân hạn hay chưa?
+
+    Dùng cho trường hợp client đã gửi refresh, server xoay token xong
+    nhưng response không tới được client (F5 giữa chừng làm trình duyệt huỷ
+    request). Client còn giữ token CŨ đã bị blacklist nên lần sau sẽ nhận 400
+    và bị đăng xuất oan dù token còn hạn 7 ngày.
+
+    Trong khoảng ân hạn này, token vừa bị xoay vẫn được chấp nhận.
+    ĐÁNH ĐỔI: kẻ đánh cắp token cũng dùng được trong khoảng đó — đây là
+    cách làm chuẩn (ví dụ Auth0 "refresh token reuse interval") và được đền
+    bù bằng thời gian ngắn (`JWT_REFRESH_REUSE_GRACE_SECONDS`, mặc định 60s).
+    """
+    if grace_seconds <= 0:
+        return False
+    from django.utils import timezone
+
+    from apps.accounts.models import JWTBlacklist
+
+    cutoff = timezone.now() - timedelta(seconds=grace_seconds)
+    return JWTBlacklist.objects.filter(jti=jti, created_at__gte=cutoff).exists()
+
+
 def rotate_refresh_token(old_refresh_token: str):
-    """Verify *old_refresh_token*, blacklist it, issue a new pair."""
-    user = verify_refresh_token(old_refresh_token)
+    """Xoay cặp token: verify *old_refresh_token*, blacklist nó, phát cặp mới.
+
+    Không dùng `verify_refresh_token` trực tiếp vì hàm đó gộp chung
+    "token bị blacklist" với mọi lỗi khác, nên không phân biệt được
+    trường hợp "vừa bị xoay trong khoảng ân hạn" để cho qua — xem
+    `blacklisted_within_grace`.
+    """
+    payload = _decode(old_refresh_token)
+    if payload.get("token_type") != "refresh":
+        raise jwt.InvalidTokenError("Expected refresh token type")
+
+    jti = payload.get("jti")
+    if jti and is_token_blacklisted(jti):
+        # Token đã bị blacklist: chỉ cho qua nếu vừa bị xoay trong khoảng ân
+        # hạn (client bị huỷ request giữa chừng). Ngoài khoảng đó là dấu hiệu tái sử
+        # dụng token — từ chối như cũ.
+        grace = getattr(settings, "JWT_REFRESH_REUSE_GRACE_SECONDS", 60)
+        if not blacklisted_within_grace(jti, int(grace)):
+            raise jwt.InvalidTokenError("Token has been blacklisted")
+
+    user = _resolve_user(payload)
     blacklist_token(old_refresh_token)
     tokens = generate_tokens(user)
     return tokens["access"], tokens["refresh"], user

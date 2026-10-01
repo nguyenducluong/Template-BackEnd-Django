@@ -24,11 +24,7 @@ from .serializers import (
     build_user_info,
 )
 from libs.responses import created_response, error_response, success_response
-from libs.auth.jwt_utils import (
-    blacklist_token,
-    generate_tokens,
-    rotate_refresh_token,
-)
+from libs.auth.jwt_utils import blacklist_token, generate_tokens
 from libs.auth.throttling import (
     LoginRateThrottle,
     RegisterRateThrottle,
@@ -149,9 +145,10 @@ class RefreshTokenView(APIView):
         serializer = TokenRefreshSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
-        access, refresh, _new_jti = rotate_refresh_token(
-            serializer.validated_data["refresh"]
-        )
+        # Token da duoc xoay NGAY TAI BUOC validate cua serializer.
+        # Den day chi lay ra dung, KHONG xoay them lan nua.
+        access = serializer.validated_data["access"]
+        refresh = serializer.validated_data["refresh"]
         return success_response(
             data={
                 "access": access,

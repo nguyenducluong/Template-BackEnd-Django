@@ -233,7 +233,12 @@ ENCRYPTION_EXCLUDED_PREFIXES = [
     # GET /crypto/public_key vì content-type không phải encrypted+json).
     "/static",
     "/media",
-    "/api/schema",
+    # AI (chat SSE): loai khoi ma hoa 2 chieu de streaming khong vo.
+    # Ly do: (1) StreamingHttpResponse doc `response.content` ben trong middleware ->
+    # noi dung bi doc sai/rong giua chung; (2) response SSE la khung TEXT lien tuc,
+    # khong phai envelope JSON, ma hoa tung frame se vo huong va lam chay nhanh.
+    # Chat log khong chua du lieu bi mat; request van duoc xac thuc bang Bearer JWT.
+    "/api/v1/ai",    "/api/schema",
     "/api/docs",
     "/api/redoc",
 ]
@@ -365,6 +370,19 @@ JWT_AUTH = {
     "USER_ID_CLAIM": "user_id",
 }
 
+# Khoang an han cho refresh token vua bi xoay (giay).
+#
+# Vi sao can: BE co token ROTATION — moi lan refresh thanh cong la blacklist
+# refresh token cu NGAY. Neu client gui refresh, server xoay xong nhung response
+# khong toi duoc client (F5 giua chung lam trinh duyet huy request), client van
+# con token CU (da bi blacklist) -> lan sau nhan 400 va bi dang xuat oan du
+# token con han 7 ngay.
+#
+# Trong khoang nay, token vua bi xoay van duoc chap nhan. Doi lai: ke danh cap
+# token cu cung dung duoc trong khoang do — day la cach lam chuan (Auth0
+# 'refresh token reuse interval'). Dat 0 de TAT hoan toan (quay ve hanh vi cu).
+JWT_REFRESH_REUSE_GRACE_SECONDS = env.int("JWT_REFRESH_REUSE_GRACE_SECONDS", default=60)
+
 # Rate Limiting (Phase 1a)
 LOGIN_RATE_LIMIT = env.int("LOGIN_RATE_LIMIT", default=5)  # requests per window
 LOGIN_RATE_LIMIT_WINDOW = env.int("LOGIN_RATE_LIMIT_WINDOW", default=60)  # seconds
@@ -398,6 +416,12 @@ RATE_LIMIT_EXCLUDED_PREFIXES = list(
 # that already have fine-grained throttles). Disable in tests/dev if noisy.
 if "/api/v1/crypto" not in RATE_LIMIT_EXCLUDED_PREFIXES:
     RATE_LIMIT_EXCLUDED_PREFIXES.append("/api/v1/crypto")
+
+# AI (chat SSE): loai khoi rate limit GLOBAL (600 req/60s).
+# Chat + MCP + Form nhieu request nho; dung thu ngan co the chan nham 1 chat dung giua
+# luong. Van con bao ve: DRF ScopedRateThrottle voi scope "ai" tren tung view AI.
+if "/api/v1/ai" not in RATE_LIMIT_EXCLUDED_PREFIXES:
+    RATE_LIMIT_EXCLUDED_PREFIXES.append("/api/v1/ai")
 
 # Trusted reverse proxies. X-Forwarded-For is ONLY honoured for rate limiting
 # when the direct peer (REMOTE_ADDR) is listed here — otherwise clients could
@@ -592,6 +616,17 @@ LOGGING = {
 PASSWORD_MAX_AGE_DAYS = env.int("PASSWORD_MAX_AGE_DAYS", default=90)
 
 # ---- AI Assistant (Ollama / generic HTTP backend) ----
+# Co the tat chatbot bang AI_CHAT_ENABLED (default False = an toan khi deploy,
+# bat lai sau khi da `ollama pull` model chat + model embedding).
+# FE doc flag nay de AN nút bot (GET /api/v1/ai/faq, meta.is_enabled).
+AI_CHAT_ENABLED = env.bool("AI_CHAT_ENABLED", default=False)
+
+# Embedding cho RAG lich su chat.
+# bge-m3: 1024 chieu, ho tro da ngon ngu (vi/en/kr).
+# DOI model => PHAI doi AI_EMBEDDING_DIMS cho khop (cot vector trong DB).
+AI_EMBEDDING_MODEL = env("AI_EMBEDDING_MODEL", default="bge-m3")
+AI_EMBEDDING_DIMS = env.int("AI_EMBEDDING_DIMS", default=1024)
+AI_EMBEDDING_TIMEOUT = env.int("AI_EMBEDDING_TIMEOUT", default=30)
 OLLAMA_BASE_URL = env("OLLAMA_BASE_URL", default="http://localhost:11434")
 OLLAMA_MODEL = env("OLLAMA_MODEL", default="gemma4:latest")
 # Cold model load (8.9GB gemma4) took ~73s in testing — be generous.

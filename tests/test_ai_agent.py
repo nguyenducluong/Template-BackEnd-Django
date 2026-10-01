@@ -6,7 +6,7 @@ Run: python manage.py test tests.test_ai_agent -v 2
 from types import SimpleNamespace
 from unittest import mock
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from apps.ai.agent import ToolAgent
 from apps.ai.tools.base import ToolSpec
@@ -28,26 +28,48 @@ def _chat_reply(content, tool_calls=None):
     return {"message": msg}
 
 
+# Danh sach tool cho phep - `_parse_json_call` nhan theo quyen de khong nhan
+# ten tool ma user khong goi duoc (model co the bia ten).
+_ALLOWED_NAMES = {"user.get_by_gen_id", "info.orgs", "system.health"}
+
+
 class ParseJsonCallTests(SimpleTestCase):
     def test_plain_json(self):
-        r = ToolAgent._parse_json_call('{"tool": "user.get_by_gen_id", "args": {"gen_id": "00000001"}}')
+        r = ToolAgent._parse_json_call('{"tool": "user.get_by_gen_id", "args": {"gen_id": "00000001"}}', _ALLOWED_NAMES)
         self.assertEqual(r, {"tool": "user.get_by_gen_id", "args": {"gen_id": "00000001"}})
 
     def test_with_code_fence(self):
-        r = ToolAgent._parse_json_call('```json\n{"tool": "info.orgs"}\n```')
+        r = ToolAgent._parse_json_call('```json\n{"tool": "info.orgs"}\n```', _ALLOWED_NAMES)
         self.assertEqual(r, {"tool": "info.orgs", "args": {}})
 
     def test_json_embedded_in_text(self):
-        r = ToolAgent._parse_json_call('Dữ liệu: {"tool": "system.health", "args": {}}')
+        r = ToolAgent._parse_json_call('Dữ liệu: {"tool": "system.health", "args": {}}', _ALLOWED_NAMES)
         self.assertEqual(r, {"tool": "system.health", "args": {}})
 
     def test_not_a_tool_call(self):
-        self.assertIsNone(ToolAgent._parse_json_call("Xin chào, hôm nay thế nào?"))
+        self.assertIsNone(ToolAgent._parse_json_call("Xin chào, hôm nay thế nào?", _ALLOWED_NAMES))
 
     def test_unknown_tool_rejected(self):
-        self.assertIsNone(ToolAgent._parse_json_call('{"tool": "nonexistent", "args": {}}'))
+        self.assertIsNone(ToolAgent._parse_json_call('{"tool": "nonexistent", "args": {}}', _ALLOWED_NAMES))
 
 
+
+    def test_json_embedded_in_prose(self):
+        # Regression: model hay tra JSON LAN trong van xuoi. Cach cu cat tu
+        # `{` dau toi `}` cuoi se gop nhieu khoi JSON thanh chuoi hong -> luon
+        # None -> agent tra ve ban thay vi goi tool.
+        r = ToolAgent._parse_json_call('I can call the \"info.orgs\" tool for you!\n\nHere:\n```json\n{\"tool\": \"info.orgs\", \"args\": {\"level\": 1}}\n```\nDone.', _ALLOWED_NAMES)
+        self.assertEqual(r, {"tool": "info.orgs", "args": {"level": 1}})
+
+    def test_multiple_json_blocks_picks_first_valid(self):
+        # Block vi du khong phai tool-call truoc, phai bo qua va lay block
+        # hop le dau tien.
+        r = ToolAgent._parse_json_call('Vi du:\n```json\n{\"tool\": \"system.health\", \"args\": {}}\n```\n\nAnd:\n```json\n{\"tool\": \"info.orgs\", \"args\": {}}\n```', _ALLOWED_NAMES)
+        self.assertEqual(r, {"tool": "system.health", "args": {}})
+
+
+
+@override_settings(AI_CHAT_ENABLED=True)
 class ToolAgentJsonFallbackTests(SimpleTestCase):
     def test_calls_tool_then_summarizes(self):
         client = _fake_client()
@@ -85,6 +107,7 @@ class ToolAgentJsonFallbackTests(SimpleTestCase):
         self.assertEqual(text, "xong")
 
 
+@override_settings(AI_CHAT_ENABLED=True)
 class ToolAgentNativeTests(SimpleTestCase):
     def test_native_tool_calls_executed(self):
         client = _fake_client()
@@ -169,6 +192,7 @@ class UserToolScopeTests(SimpleTestCase):
         hp.assert_called_with(caller, ["view_profile"])
 
 
+@override_settings(AI_CHAT_ENABLED=True)
 class AIChatAgentViewTests(SimpleTestCase):
     """Locked view tới agent (tools=true) qua endpoint SSE."""
 

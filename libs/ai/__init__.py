@@ -3,8 +3,10 @@ Reusable AI backend clients.
 
 - ``OllamaClient``     — native Ollama API (/api/chat, streaming)
 - ``GenericCurlClient``— any curl-style JSON endpoint with custom headers
+- ``EmbeddingClient``  — text -> vector (Ollama /api/embed) cho RAG
 """
 
+from libs.ai.embedding_client import EmbeddingClient
 from libs.ai.errors import AIServiceError, AIServiceTimeout, AIServiceUnavailable
 from libs.ai.http_client import GenericCurlClient
 from libs.ai.ollama_client import OllamaClient
@@ -15,4 +17,5 @@ __all__ = [
     "AIServiceUnavailable",
     "GenericCurlClient",
     "OllamaClient",
+    "EmbeddingClient",
 ]

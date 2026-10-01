@@ -12,6 +12,10 @@ channels>=4.0
 channels-redis>=4.2
 pgvector>=0.3
 
+# AI - validate args cua tool truoc khi chay (JSON Schema theo MCP tools).
+# Bat buoc: tool duoc AI goi => khong tin AI, args phai khop schema.
+jsonschema>=4.21
+
 # Crypto (RSA-OAEP + AES-GCM for API payload encryption)
 cryptography>=42.0.0
 
@@ -25,7 +29,6 @@ Pillow>=10.0
 numpy>=1.26
 opencv-python>=4.9
 insightface>=0.7
-pgvector>=0.3
 
 # Excel (libs.excel) - openpyxl doc .xlsx/.xlsm thuan Python, khong can cai MS Excel.
 # pywin32 chi la FALLBACK cho file .xls cu (openpyxl khong doc duoc) va chi tren Windows.
