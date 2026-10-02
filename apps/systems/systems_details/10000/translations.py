@@ -57,6 +57,7 @@ TRANSLATIONS = {
 	"dialog.dlg_input_system.sections.2.headers.qty": {"vi": "Số lượng", "en": "Qty", "kr": "수량"},
 	"dialog.dlg_input_system.sections.2.headers.status": {"vi": "Trạng thái", "en": "Status", "kr": "상태"},
 	"dialog.dlg_input_system.sections.1.label": {"vi": "Tệp đính kèm", "en": "Attachments", "kr": "첨부 파일"},
+	"dialog.dlg_input_system.sections.3.label": {"vi": "Hình ảnh (16:9)", "en": "Images (16:9)", "kr": "이미지 (16:9)"},
 	"dialog.dlg_input_system.actions.0.label": {"vi": "Hủy bỏ", "en": "Cancel", "kr": "취소"},
 	"dialog.dlg_input_system.actions.1.label": {"vi": "Lưu", "en": "Save", "kr": "저장"},
 	"dialog.dlg_input_system.actions.1.confirmation.title": {

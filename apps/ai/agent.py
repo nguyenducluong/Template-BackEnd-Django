@@ -1,17 +1,30 @@
 """
 ToolAgent — vòng lặp cho phép AI trong Django gọi tool để đọc/phân tích dữ liệu.
 
-Cơ chế:
-  1. Gửi messages (+ danh sách tool) tới Ollama.
-  2. Native `message.tool_calls` -> execute -> append kết quả -> lặp.
-  3. JSON fallback: model trả `{"tool", "args"}` -> execute -> lặp.
-  4. Hết vòng (max_turns) hoặc không còn tool_call -> trả text cuối.
+Cơ chế (theo thứ tự ưu tiên):
+  1. NATIVE tool-calling (`message.tool_calls`) — đường CHÍNH, model tự sinh
+     lệnh gọi đúng chuẩn Ollama/OpenAI, không phải dạy model viết JSON tay.
+  2. JSON fallback (`{"tool", "args"}`) — chỉ khi `use_native_tools=False`.
+  3. Hết vòng (`max_turns`) hoặc không còn tool_call -> trả text cuối.
+
+HAI LỐI CHẠY:
+  - `run()`        : blocking, trả chuỗi (test / gọi nội bộ).
+  - `run_stream()` : generator phát SỰ KIỆN từng bước. Đây là đường dùng cho
+    HTTP: nhờ vậy user thấy chữ NGAY (không phải chờ agent chạy xong rồi mới
+    cắt 24 ký tự), và thấy được tool nào đang được gọi.
+
+Sự kiện `run_stream()` phát ra (dict):
+  {"type": "status",    "text": "...", "turn": int}
+  {"type": "tool_call", "name": "...", "arguments": {...}, "is_error": bool}
+  {"type": "content",   "text": "..."}
 """
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
+
+from django.conf import settings
 
 from libs.ai.ollama_client import OllamaClient
 
@@ -33,9 +46,18 @@ JSON_TOOL_PROMPT = (
 )
 
 NATIVE_TOOL_PROMPT = (
-    "Bạn được phép gọi tool để đọc dữ liệu hệ thống. "
-    "Chỉ gọi tool khi thật sự cần dữ liệu; ngược lại trả lời bình thường."
+    "Bạn là trợ lý AI của hệ thống nội bộ.\n"
+    "- Cần dữ liệu nào không có trong câu hỏi thì gọi tool tương ứng "
+    "(mỗi lần chỉ 1 tool, đợi kết quả rồi mới quyết định bước sau).\n"
+    "- Sau khi đã có kết quả tool, PHẢI tổng hợp thành câu trả lời tiếng Việt "
+    "cho người dùng. Tuyệt đối không in tên tool, không in cú pháp JSON, "
+    "không viết kiểu 'Gọi tool: ...'.\n"
+    "- Không bịa số liệu. Tool không có kết quả thì nói rõ là không có."
 )
+
+# Số ký tự tool-result tối đa đưa vào lượt sau — chặn context nổ khi tool trả
+# danh sách dài (org_tree, header_structure...).
+MAX_TOOL_RESULT_CHARS = 4000
 
 
 def _normalize_result(result, name: str) -> Dict[str, Any]:
@@ -52,75 +74,170 @@ def _normalize_result(result, name: str) -> Dict[str, Any]:
     return {"content": [{"type": "text", "text": text}]}
 
 
+def _result_to_text(result, name: str) -> str:
+    """Kết quả tool (đã normalize) -> chuỗi đưa vào messages, có cắt bớt."""
+    normalized = _normalize_result(result, name)
+    parts = [item["text"] for item in (normalized.get("content") or [])
+             if isinstance(item, dict) and isinstance(item.get("text"), str)]
+    text = "\n".join(parts) or json.dumps(normalized, ensure_ascii=False, default=str)
+    if len(text) > MAX_TOOL_RESULT_CHARS:
+        text = text[:MAX_TOOL_RESULT_CHARS] + "\n...(còn nữa, đã cắt bớt)"
+    return text
+
+
 class ToolAgent:
     def __init__(self, client: Optional[OllamaClient] = None, max_turns: int = 3,
-                 use_native_tools: bool = False):
+                 use_native_tools: bool = True):
         self.client = client or OllamaClient()
         self.max_turns = max_turns or 1
+        # Native tool-calling mặc định BẬT (xem `run_stream`).
         self.use_native_tools = use_native_tools
+        self.options = self._build_options()
+
+    @staticmethod
+    def _build_options() -> Dict[str, Any]:
+        """Tham số sinh: temperature thấp + giới hạn độ dài.
+
+        - `temperature` mặc định 0.2: tool-calling cần tính xác định, không bịa.
+        - `num_predict`: chặn model trả quá dài, bảo vệ timeout gunicorn.
+        """
+        options: Dict[str, Any] = {"temperature": float(getattr(settings, "AI_TEMPERATURE", 0.2))}
+        num_predict = getattr(settings, "AI_NUM_PREDICT", None)
+        if num_predict:
+            options["num_predict"] = int(num_predict)
+        return options
 
     # ------------------------------------------------------------------
     def run(self, messages: List[Dict[str, str]], user=None) -> str:
         """Chạy vòng lặp tool. Trả về text phản hồi cuối cùng."""
+        final = ""
+        for event in self.run_stream(messages, user):
+            if event.get("type") == "content":
+                final = event.get("text", "")
+        return final
+
+    # ------------------------------------------------------------------
+    def run_stream(self, messages: List[Dict[str, str]], user=None) -> Generator[Dict[str, Any], None, None]:
+        """Chạy agent và phát sự kiện từng bước (status / tool_call / content)."""
         messages = [dict(m) for m in messages]
 
         # Lọc tool theo QUYỀN của user TRƯỚC khi đưa cho model. Nếu không lọc:
         # model vẫn thấy tên + sơ đồ của mọi tool → lộ tool ngoài phạm vi và tốn
         # lượt gọi cho các tool chắc chắn trả "không có quyền".
-        # `execute_tool` vẫn kiểm tra quyền lần nữa khi thực thi → fail-closed.
+        # `execute_tool` kiểm tra quyền lần nữa khi thực thi → fail-closed.
         allowed = self._allowed_specs(user)
         allowed_names = {spec.name for spec in allowed}
 
+        # Không có tool nào được phép → tắt tool hoàn toàn: tránh tốn context và
+        # tránh model "bịa" tên tool không có thật.
+        if not allowed:
+            self.use_native_tools = False
+
         tool_prompt = NATIVE_TOOL_PROMPT if self.use_native_tools else self._json_prompt(allowed)
+        messages = self._inject_system_prompt(messages, tool_prompt)
 
-        has_sys = any(m.get("role") == "system" for m in messages)
-        if not has_sys:
-            messages = [{"role": "system", "content": tool_prompt}] + messages
-        else:
-            for m in messages:
-                if m.get("role") == "system":
-                    m["content"] = (m.get("content", "") + "\n\n" + tool_prompt)
-                    break
+        yield {"type": "status", "text": "Đang phân tích câu hỏi...", "turn": 0}
 
-        for _ in range(self.max_turns):
-            tools = [spec.to_ollama_tool() for spec in allowed] if self.use_native_tools else None
-            response = self.client.chat(messages, tools=tools)
-            reply = response.get("message", {})
-            content = reply.get("content", "") or ""
+        last_text = ""
+        for turn in range(self.max_turns):
+            turn_tools = [spec.to_ollama_tool() for spec in allowed] if self.use_native_tools else None
+            buffered: List[str] = []
+            tool_calls: List[Dict[str, Any]] = []
 
-            # 1) Native tool_calls
-            tool_calls = reply.get("tool_calls") or []
+            for event in self.client.chat_stream_events(messages, options=self.options, tools=turn_tools):
+                if event.get("tool_calls"):
+                    tool_calls.extend(event["tool_calls"])
+                content = event.get("content") or ""
+                if content:
+                    # CHỈ BỘ ĐỆM chứ chưa phát: native tool-calling đẩy
+                    # tool_calls ở frame `done` cuối, tức lúc này chưa biết
+                    # model có gọi tool không. Phát sớm sẽ bị trùng ("Gọi tool:
+                    # x") — đúng lỗi model nhỏ hay mắc.
+                    buffered.append(content)
+
             if tool_calls:
-                for tc in tool_calls:
-                    fn = tc.get("function", {})
-                    name = fn.get("name", "")
-                    args = fn.get("arguments", {}) or {}
-                    self._execute_and_collect(messages, user, name, args)
+                for call in self._normalize_tool_calls(tool_calls):
+                    name = call.get("name") or ""
+                    if name not in allowed_names:
+                        logger.warning("Agent từ chối tool ngoài phạm vi: %s", name)
+                        continue
+                    result = execute_tool(name, user, call.get("arguments") or {})
+                    messages.append({"role": "tool", "content": _result_to_text(result, name)})
+                    yield {
+                        "type": "tool_call",
+                        "name": name,
+                        "arguments": call.get("arguments") or {},
+                        "is_error": bool(isinstance(result, dict) and result.get("isError")),
+                    }
+                    logger.info("Agent tool called: %s by user=%s", name, getattr(user, "id", None))
                 continue  # tổng hợp ở lượt sau
 
-            # 2) JSON fallback
-            if not self.use_native_tools:
-                call = self._parse_json_call(content, allowed_names)
+            text = "".join(buffered)
+
+            # JSON fallback: model tự viết {"tool": ..., "args": ...} trong text.
+            if not tool_calls:
+                call = self._parse_json_call(text, allowed_names)
                 if call is not None:
-                    self._execute_and_collect(messages, user, call["tool"], call["args"])
+                    result = execute_tool(call["tool"], user, call["args"])
+                    messages.append({"role": "tool", "content": _result_to_text(result, call["tool"])})
+                    yield {
+                        "type": "tool_call",
+                        "name": call["tool"],
+                        "arguments": call["args"],
+                        "is_error": bool(isinstance(result, dict) and result.get("isError")),
+                    }
                     continue
 
-            return content
+            last_text = text
+            if text:
+                # Lượt này có text mà không có tool_call ⇒ đây là lượt trả lời
+                # cuối. Cắt nhỏ để FE nhận dần (chữ chạy thật, không nhảy cụt).
+                for i in range(0, len(text), 24):
+                    yield {"type": "content", "text": text[i:i + 24]}
+                return
 
-        return "Tôi đã đạt giới hạn vòng lặp tool. Vui lòng thử lại với câu hỏi cụ thể hơn."
+        if not last_text:
+            yield {
+                "type": "content",
+                "text": "Tôi đã đạt giới hạn vòng lặp tool. Vui lòng thử lại với câu hỏi cụ thể hơn.",
+            }
 
     # ------------------------------------------------------------------
-    def _execute_and_collect(self, messages, user, name: str, args: Dict) -> None:
-        result = execute_tool(name, user, args or {})
-        normalized = _normalize_result(result, name)
-        messages.append({"role": "assistant", "content": f"Gọi tool: {name}"})
-        messages.append({
-            "role": "tool",
-            "content": json.dumps(normalized.get("content", []), ensure_ascii=False),
-        })
-        logger.info("Agent tool called: %s by user=%s", name, getattr(user, "id", None))
+    @staticmethod
+    def _inject_system_prompt(messages: List[Dict[str, str]], tool_prompt: str) -> List[Dict[str, str]]:
+        """Gắn prompt hệ thống, hoặc nối vào system sẵn có."""
+        for m in messages:
+            if m.get("role") == "system":
+                m["content"] = (m.get("content", "") + "\n\n" + tool_prompt)
+                return messages
+        return [{"role": "system", "content": tool_prompt}, *messages]
 
-    # ------------------------------------------------------------------
+    @staticmethod
+    def _normalize_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Chuẩn hóa tool_call Ollama/OpenAI về {name, arguments} dict.
+
+        `arguments` có thể là dict (đa số server) hoặc chuỗi JSON (model nhỏ hay
+        trả kiểu này) -> parse lại; hỏng thì `{}` để validate_args bắt lỗi.
+        """
+        normalized = []
+        for call in tool_calls or []:
+            if not isinstance(call, dict):
+                continue
+            fn = call.get("function") or {}
+            name = (fn.get("name") or "").strip()
+            if not name:
+                continue
+            args = fn.get("arguments")
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args) if args.strip() else {}
+                except ValueError:
+                    args = {}
+            if not isinstance(args, dict):
+                args = {}
+            normalized.append({"name": name, "arguments": args})
+        return normalized
+
     @staticmethod
     def _allowed_specs(user) -> list:
         """Tool mà user ĐƯỢC gọi — lọc qua AIMCPService (nguồn duy nhất về quyền)."""

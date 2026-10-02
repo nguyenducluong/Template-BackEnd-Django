@@ -7,6 +7,8 @@ urlpatterns = [
     path("faq", views.FAQListView.as_view(), name="ai-faq"),
     # Meta cho FE: cờ AI_CHAT_ENABLED + nhãn đa ngon ngu + danh sach tool (da loc quyen).
     path("meta", views.AIMetaView.as_view(), name="ai-meta"),
+    # Chan doan backend AI (Ollama online? model? embedding co san?).
+    path("health", views.AIHealthView.as_view(), name="ai-health"),
     # JSON-RPC 2.0 cho tab MCP/Form: {method: "tools/list" | "tools/call"}.
     path("mcp", views.AIMCPView.as_view(), name="ai-mcp"),
     # Lich su phien chat (chi chinh user) + form dong cho tab Form.

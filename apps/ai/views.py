@@ -22,8 +22,10 @@ emitted as a final SSE error frame so the client can render them.
 
 import json
 import logging
+import time
 
 from django.core.cache import cache
+from django.conf import settings
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
@@ -174,6 +176,48 @@ class AIMetaView(APIView):
         return success_response(data=data, message=_("Success"))
 
 
+class AIHealthView(APIView):
+    """GET /api/v1/ai/health — chẩn đoán nhanh backend AI.
+
+    Dùng cho vận hành (FE admin panel / giám sát), KHÔNG dùng để quyết định
+    bật/tắt chatbot — việc đó thuộc `GET /ai/meta` (`chat_enabled`).
+
+    Luôn trả 200 kể cả khi Ollama chết: đây là endpoint chẩn đoán, trả 503 sẽ
+    làm monitoring tưởng chính API hỏng. Sai lệch nằm ở `ollama.online`.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "ai"
+    http_method_names = ["get", "options"]
+
+    @extend_schema(tags=["AI"], responses={200: dict})
+    def get(self, request):
+        from libs.ai.embedding_client import embedding_is_available
+
+        service = get_ai_mcp_service()
+        chat_enabled = service.is_enabled()
+        ollama_online = _ollama_available() if chat_enabled else False
+        embedding_ok = embedding_is_available() if chat_enabled else False
+        return success_response(
+            data={
+                "chat_enabled": chat_enabled,
+                "ollama": {
+                    "online": ollama_online,
+                    "base_url": _client.base_url,
+                    "model": _client.model,
+                },
+                "embedding": {
+                    "available": embedding_ok,
+                    "model": getattr(settings, "AI_EMBEDDING_MODEL", ""),
+                    "dims": getattr(settings, "AI_EMBEDDING_DIMS", None),
+                },
+                "tools": [spec.name for spec in service.list_tools(request.user)],
+            },
+            message=_("Success"),
+        )
+
+
 class AIChatSessionListCreateView(APIView):
     """GET /api/v1/ai/sessions — lịch sử phiên (popover lịch sử ở FE).
 
@@ -322,6 +366,7 @@ class AIChatView(APIView):
         # Không có `session` ⇒ caller không muốn lịch sử: bỏ qua RAG, chat vẫn chạy.
         context = []
         if session is not None:
+            rag_started = time.monotonic()
             try:
                 rag.save_message(request.user, session, AIChatMessage.ROLE_USER, question)
             except Exception:  # noqa: BLE001
@@ -343,27 +388,67 @@ class AIChatView(APIView):
                     *context,
                     *messages,
                 ]
+            # ĐO NỀN: RAG gọi Ollama (embed) + query DB ngay TRONG request, có thể
+            # vài chục giây nếu Ollama chậm. Log để biết có nên bỏ sang nền hay không.
+            logger.info(
+                "AI RAG done in %.2fs (context=%d, session=%s)",
+                time.monotonic() - rag_started, len(context), getattr(session, "id", None),
+            )
 
         if use_tools:
-            # Agent tool-calling: cần dữ liệu thì gọi tool (non-stream), rồi
-            # stream text cuối cùng. Giữ `tools: false` để dùng luồng cũ.
-            try:
-                agent = ToolAgent(client=_client, max_turns=max_turns)
-                final_text = agent.run(messages, user=request.user)
-            except AIServiceError as exc:
-                logger.exception("AI agent run failed")
+            # Agent tool-calling + STREAMING THẬT: vòng lặp agent phát sự kiện
+            # (status / tool_call / content) và ta forward từng sự kiện ra SSE.
+            # Trước đây dùng `agent.run()` blocking rồi cắt 24 ký tự ⇒ user phải
+            # chờ hết agent mới thấy chữ, mất hết ý nghĩa của SSE.
+            if not _ollama_available():
+                logger.warning("AI chat: Ollama unavailable at %s", _client.base_url)
                 return error_response(
-                    message=str(exc), status=status.HTTP_502_BAD_GATEWAY,
+                    message=_("AI service is currently unavailable. Please try again later."),
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
 
-            # Luu lich su TRUOC khi stream: final_text da san co day du, nen
-            # client ngat giua chung van giu duoc ca cau tra loi.
-            _save_history(request.user, session, final_text)
+            agent = ToolAgent(client=_client, max_turns=max_turns, use_native_tools=True)
+            buffer: list = []
 
             def agent_stream():
-                for i in range(0, len(final_text), 24):
-                    yield _sse({"content": final_text[i:i + 24]})
-                yield "data: [DONE]\n\n"
+                started = time.monotonic()
+                try:
+                    for event in agent.run_stream(messages, user=request.user):
+                        kind = event.get("type")
+                        if kind == "content":
+                            text = event.get("text") or ""
+                            buffer.append(text)
+                            yield _sse({"content": text})
+                        elif kind == "tool_call":
+                            yield _sse({
+                                "tool_call": {
+                                    "name": event.get("name"),
+                                    "is_error": bool(event.get("is_error")),
+                                }
+                            })
+                        elif kind == "status":
+                            yield _sse({"status": event.get("text", "")})
+                    yield "data: [DONE]\n\n"
+                except AIServiceTimeout:
+                    logger.exception("AI agent stream timed out")
+                    yield _sse({"error": _("AI request timed out. Please try again.")})
+                    yield "data: [DONE]\n\n"
+                except AIServiceUnavailable:
+                    logger.exception("AI agent: backend went away mid-stream")
+                    yield _sse({"error": _("AI service is currently unavailable.")})
+                    yield "data: [DONE]\n\n"
+                except AIServiceError as exc:
+                    logger.exception("AI agent stream error")
+                    yield _sse({"error": str(exc)})
+                    yield "data: [DONE]\n\n"
+                finally:
+                    elapsed = time.monotonic() - started
+                    # KHÔNG yield trong `finally` — xem giải thích ở `event_stream`.
+                    _save_history(request.user, session, "".join(buffer))
+                    logger.info(
+                        "AI agent stream done in %.2fs (session=%s, tools=%s)",
+                        elapsed, getattr(session, "id", None), use_tools,
+                    )
 
             response = StreamingHttpResponse(
                 agent_stream(), content_type="text/event-stream")
@@ -386,6 +471,7 @@ class AIChatView(APIView):
         def event_stream():
             # Gom noi dung da stream de luu vao lich su.
             buffer: list = []
+            started = time.monotonic()
             try:
                 for chunk in _client.chat_stream(messages):
                     buffer.append(chunk)
@@ -409,6 +495,10 @@ class AIChatView(APIView):
                 # RuntimeError lam vong do that. Frame [DONE] da phat inline o cac
                 # nhanh ben tren.
                 _save_history(request.user, session, "".join(buffer))
+                logger.info(
+                    "AI chat stream done in %.2fs (session=%s, tools=False)",
+                    time.monotonic() - started, getattr(session, "id", None),
+                )
 
         response = StreamingHttpResponse(
             event_stream(), content_type="text/event-stream"

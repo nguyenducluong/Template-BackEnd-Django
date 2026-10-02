@@ -167,6 +167,28 @@ DETAILS = {
 							{"title": {"text": "Team", "required": True}, "options": {"key": "team", "type": "tree", "width": 1, "validate": {"required": True}}},
 							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "vendor_code", "type": "input", "width": 1, "placeholder": "VD: DK18", "validate": {"required": True, "min_length": 2, "max_length": 8, "pattern": "^[A-Za-z0-9-]+$"}}},
 							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "vendor_name", "type": "input", "width": 1, "placeholder": "VD: DAE RIM", "validate": {"required": True, "max_length": 50}}},
+							# Ô có gợi ý từ server (debounce 300ms rồi gọi `func: "remote_search"`).
+							# `set_on_select`: chọn 1 gợi ý → TỰ ĐỘNG điền `vendor_code` sang ô
+							# "vendor_code" ở trên (set value cho 1 key khác trong dialog).
+							{
+								"title": {"text": "Vendor (gợi ý)", "required": False},
+								"options": {
+									"key": "vendor_pick",
+									"type": "autocomplete",
+									"width": 2,
+									"placeholder": "Nhập >= 2 ký tự để tìm vendor...",
+									"remote": {
+										"url": "systems/init_data",
+										"func": "remote_search",
+										"search_key": "query",
+										"min_length": 2,
+										"page_size": 20,
+										"value_key": "value",
+									},
+									"set_on_select": {"target_key": "vendor_code", "from_key": "vendor_code"},
+									"validate": {},
+								},
+							},
 							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "vendor_short", "type": "input", "width": 1, "placeholder": "Tên ngắn (không bắt buộc)", "validate": {"max_length": 20}}},
 							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "inspection_date", "type": "date", "width": 2, "validate": {"required": True}}},
 							{"title": {"text": "Vendor Sorting", "required": True}, "options": {"key": "lot_no", "type": "input", "width": 2, "placeholder": "VD: LOT-2025-0001", "validate": {"required": True, "min_length": 4, "max_length": 20}}},
@@ -227,6 +249,27 @@ DETAILS = {
 							],
 						},
 						"validate": {"min_selected": 1, "max_selected": 3},
+					},
+					# ────────────────────────────────────────────────────
+					# SECTION 4: HÌNH ẢNH (type = image)
+					# FE render bằng DetailsDialogImage: lưới ô 16:9, mỗi ảnh có
+					# 3 nút icon (full màn hình / edit / xoá).
+					# Ảnh KHÔNG nằm trong `values` — nó đi kèm `files` (multipart)
+					# nên validate theo `min_images`/`max_images` (đếm file nhận được).
+					{
+						"key": "image_section",
+						"type": "image",
+						"show": True,
+						"label": "@dialog.dlg_input_system.sections.3.label",
+						"config": {
+							"aspect": 1.7777777778,  # 16/9
+							"max_images": 6,
+							"max_size_mb": 10,      # chặn sớm ảnh quá nặng (trước khi nén)
+							"target_size_mb": 0.8,  # dung lượng đích sau khi nén (mỗi ảnh)
+							"max_dimension": 1920,   # cạnh dài tối đa sau khi nén
+							"error_key": "dialog_files",
+						},
+						"validate": {"max_images": 6},
 					},
 				],
 				"actions": [

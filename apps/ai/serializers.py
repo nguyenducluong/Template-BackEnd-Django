@@ -8,7 +8,9 @@ class AIChatMessageSerializer(serializers.Serializer):
     """One message in the conversation history sent to the AI."""
 
     role = serializers.ChoiceField(choices=["user", "assistant", "system"])
-    content = serializers.CharField(allow_blank=False, trim_whitespace=True)
+    # `max_length` chặn 1 tin khổng lồ làm phình context (và vượt context window
+    # của model nhỏ như qwen2.5-coder:1.5b). 4000 ký tự là trần hợp lý cho 1 lượt.
+    content = serializers.CharField(allow_blank=False, trim_whitespace=True, max_length=4000)
 
 
 class AIChatRequestSerializer(serializers.Serializer):

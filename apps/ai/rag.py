@@ -47,6 +47,10 @@ MIN_SIMILARITY = 0.35
 # Neu bo, boi canh se luon kem them rat nhieu noi dung lien quan nhat.
 WEAK_SIMILARITY = 0.0
 
+# Trần số message quét khi KHÔNG có pgvector (fallback Python). User chat nhiều
+# sẽ có hàng chục nghìn dòng; quét hết mỗi lượt hỏi là nghẽn CPU + RAM.
+MAX_SCAN_MESSAGES = 500
+
 
 def _cosine(a, b) -> float:
     """Tu tinh cosine giua 2 vector (dung o nhanh fallback)."""
@@ -99,17 +103,24 @@ def build_context(user, question: str, top_k: int = DEFAULT_TOP_K) -> List[Dict[
                 CosineDistance = None
             if CosineDistance is not None:
                 rows = []
+                # PHẢI truyền CẢ vector query: `CosineDistance(field)` một tham số
+                # là `CosineDistance(field, other_field)` — truyền thiếu sẽ raise
+                # TypeError và rơi xuống fallback Python (chậm, quét toàn bảng).
                 for field in ("q_embedding", "a_embedding"):
                     qs = base.exclude(**{f"{field}__isnull": True}).annotate(
-                        distance=CosineDistance(field)
+                        distance=CosineDistance(field, query_vector)
                     )
                     for row in qs.order_by("distance")[:top_k]:
                         rows.append((row, 1.0 - float(row.distance)))
                 rows.sort(key=lambda item: item[1], reverse=True)
                 return _to_context(rows, top_k)
-        # Fallback: quet bang Python tren vector luu JSON.
+        # Fallback: quét bang Python tren vector luu JSON.
+        # CHỈ xét `MAX_SCAN_MESSAGES` message gần nhất — user tích cực chat sẽ có
+        # hàng chục nghìn dòng; quét hết mỗi lượt hỏi là nghẽn CPU. Ưu tiên tin
+        # gần đây cũng hợp lý vì RAG chủ yếu phục vụ "nói nhớ lại vừa hỏi".
+        scanned = base.order_by("-created_at").only("id", "role", "content", "q_embedding", "a_embedding")[:MAX_SCAN_MESSAGES]
         scored = []
-        for message in base.only("id", "role", "content", "q_embedding", "a_embedding"):
+        for message in scanned:
             best = -1.0
             for field in ("q_embedding", "a_embedding"):
                 stored = _vector_field(message, field)

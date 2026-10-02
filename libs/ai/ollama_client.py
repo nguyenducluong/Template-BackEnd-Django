@@ -110,17 +110,29 @@ class OllamaClient:
         self._raise_for_error(response)
         return response.json()
 
-    def chat_stream(
+    def chat_stream_events(
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
         tools: Optional[List[Dict]] = None,
-    ) -> Generator[str, None, None]:
-        """Streaming chat — yields delta text chunks as they arrive.
+    ) -> Generator[Dict[str, Any], None, None]:
+        """Streaming chat — yield TỪNG SỰ KIỆN dạng dict, giữ nguyên tin nhắn.
 
-        Raises the same AIServiceError family as ``chat``; network failures
-        mid-stream surface as AIServiceError too.
+        Yield: ``{"content": "<delta>", "tool_calls": [...]}``
+
+        - ``content``   : phần text delta (có thể rỗng ở frame tool).
+        - ``tool_calls``: native tool-calling của Ollama/OpenAI. Chuẩn của
+          Ollama đẩy TOÀN BỘ ``tool_calls`` ở frame ``done`` cuối cùng, nên
+          đây là nơi DUY NHẤT agent biết model có muốn gọi tool hay không.
+
+        VÌ SAO KHÔNG DÙNG `chat_stream` CHO AGENT:
+          `chat_stream` chỉ yield text và BỎ QUA `tool_calls` ⇒ agent không bao
+          giờ biết model muốn gọi tool, mọi lượt gọi tool trở thành 1 vòng
+          lãng phí. Agent dùng hàm này; luồng chat thuần vẫn dùng
+          `chat_stream` (đơn giản hơn).
+
+        Raises the same AIServiceError family as ``chat``.
         """
         payload = self._build_payload(messages, model, options, stream=True, tools=tools)
         response = self._post("/api/chat", payload, stream=True)
@@ -135,15 +147,33 @@ class OllamaClient:
                     continue
                 if data.get("error"):
                     raise AIServiceError(f"Ollama stream error: {data['error']}")
-                content = data.get("message", {}).get("content", "")
-                if content:
-                    yield content
+                message = data.get("message") or {}
+                tool_calls = message.get("tool_calls") or []
+                content = message.get("content") or ""
+                if content or tool_calls:
+                    yield {"content": content, "tool_calls": tool_calls}
                 if data.get("done"):
                     break
         except requests.exceptions.RequestException as exc:
             raise AIServiceError(f"Ollama stream interrupted: {exc}") from exc
         finally:
             response.close()
+
+    def chat_stream(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None,
+        tools: Optional[List[Dict]] = None,
+    ) -> Generator[str, None, None]:
+        """Streaming chat — yields delta text chunks as they arrive.
+
+        Raises the same AIServiceError family as ``chat``; network failures
+        mid-stream surface as AIServiceError too.
+        """
+        for event in self.chat_stream_events(messages, model, options, tools):
+            if event.get("content"):
+                yield event["content"]
 
     def _build_payload(self, messages, model, options, stream: bool,
                        tools: Optional[List[Dict]] = None) -> Dict[str, Any]:

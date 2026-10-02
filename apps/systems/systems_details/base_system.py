@@ -344,7 +344,7 @@ def _is_empty(value):
     return False
 
 
-def validate_field_values(dialog_cfg, values):
+def validate_field_values(dialog_cfg, values, files=None):
     """Validate ``values`` theo rule của từng field trong ``dialog_cfg``.
 
     Trả về ``errors`` dạng ``{field_key: [message]}`` — đúng shape mà FE đọc
@@ -352,6 +352,10 @@ def validate_field_values(dialog_cfg, values):
 
     Chỉ kiểm tra field CÓ khai báo ``options.key``; field thiếu ``key`` (config cũ)
     thì bỏ qua — người dùng vẫn được validate qua ``action.validate.required``.
+
+    ``files``: danh sách file đã nhận từ multipart (danh sách dict có ``mime``),
+    dùng cho section ``type="image"`` — ảnh nằm ngoài ``values`` nên không thể
+    đếm từ đó. Mặc định rỗng nên lời gọi cũ không đổi hành vi.
     """
     errors = {}
     for section in ((dialog_cfg or {}).get("sections") or []):
@@ -373,6 +377,21 @@ def validate_field_values(dialog_cfg, values):
                 errors[selected_key] = [
                     _("You may select at most %(n)s row(s).") % {"n": rules["max_selected"]}
                 ]
+            continue
+
+        # Section ẢNH (type="image") — validate theo SỐ ẢNH đã gửi lên.
+        # Ảnh nằm trong `files` (multipart) chứ không phải `values`, nên đếm trực
+        # tiếp file nhận được. Đồng bộ với FE `validate_image_section`.
+        if section.get("type") == "image":
+            rules = section.get("validate") or {}
+            if not rules:
+                continue
+            error_key = (section.get("config") or {}).get("error_key") or "files"
+            count = sum(1 for item in (files or []) if str(item.get("mime") or "").startswith("image/"))
+            if rules.get("min_images") and count < int(rules["min_images"]):
+                errors[error_key] = [_("Please attach at least %(n)s image(s).") % {"n": rules["min_images"]}]
+            if rules.get("max_images") and count > int(rules["max_images"]):
+                errors[error_key] = [_("You may attach at most %(n)s image(s).") % {"n": rules["max_images"]}]
             continue
 
         if section.get("show") is False:
@@ -575,12 +594,14 @@ def submit_form(request, header, params=None):
         ]
     # 4b. Rule chi tiết theo từng field (`sections[].fields[].options.validate`):
     # độ dài / pattern / khoảng số — client KHÔNG được tự quyết định.
+    # File đọc TRƯỚC ở đây vì section `type="image"` validate theo số ảnh nhận
+    # được (nằm trong files, không có trong values).
+    files = _collect_files(request, params)
     if dialog_cfg and not errors.get("values"):
-        errors.update(validate_field_values(dialog_cfg, values))
+        errors.update(validate_field_values(dialog_cfg, values, files))
 
     # 5. Giới hạn dung lượng file — tổng size lấy từ FILE SERVER NHẬN ĐƯỢC
     # (xem _collect_files), không dùng số client khai trong params.files.
-    files = _collect_files(request, params)
     max_mb = getattr(settings, "SYSTEMS_UPLOAD_MAX_MB", 15)
     total_size = sum(int(item.get("size") or 0) for item in files)
     if total_size > max_mb * 1024 * 1024:

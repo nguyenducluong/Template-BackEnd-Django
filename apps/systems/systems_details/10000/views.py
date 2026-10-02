@@ -73,6 +73,59 @@ def search(request, header, params=None):
 	)
 
 
+def remote_search(request, header, params=None):
+	"""Tra cứu từ khoá cho ô nhập `type: "autocomplete"` trong dialog.
+
+	FE gọi qua dispatcher `init_data` với `func: "remote_search"` sau khi người
+	dùng ngừng gõ 300ms (debounce phía FE — xem
+	`STD/src/redux/systemSlice/detailsSlice/detailsThunks.jsx::searchDetailsRemote`).
+
+	Params:
+		query      : từ khoá (tên tham số do FE khai ở `options.remote.search_key`,
+		             mặc định "query").
+		page_size  : số kết quả tối đa (mặc định 20, chặn trần 50).
+
+	Resp: envelope chuẩn, `data` là MẢNG phẳng — mỗi phần tử có `value` + `label`
+	để `Autocomplete` của MUI dùng được, cộng thêm mọi trường nghiệp vụ khác mà
+	`set_on_select` có thể cần (ví dụ `vendor_code` để điền sang ô khác).
+
+	Số trả về PHẢI là mảng rỗng khi không có kết quả — không trả null, không báo
+	lỗi 500: người dùng đang gõ, mọi lỗi đều phải quy về "không có kết quả".
+
+	TODO: header thật thay bằng ORM query + phân trang thật (ví dụ
+	`Organization.objects.filter(name__icontains=term)[:page_size]`).
+	"""
+	params = params or {}
+	term = str(params.get('query') or '').strip()
+	# Chặn trần để 1 từ khoá rộng không kéo về hàng nghìn dòng.
+	try:
+		page_size = min(max(int(params.get('page_size') or 20), 1), 50)
+	except (TypeError, ValueError):
+		page_size = 20
+
+	if not term:
+		return success_response(data=[], message=_('Search completed.'))
+
+	_payload = base_system._load_details_payload(header)
+	_table = ((_payload or {}).get('data') or {}).get('table') or {}
+	rows = list(_table.get('table_data') or [])
+	term_lower = term.lower()
+	matched = [row for row in rows if term_lower in str(row.get('vendorCode', '')).lower() or term_lower in str(row.get('vendorName', '')).lower()]
+
+	items = [
+		{
+			# `value` là giá trị sẽ ghi vào dialog_values khi chọn.
+			'value': row.get('vendorCode'),
+			'label': row.get('vendorName') or row.get('vendorCode'),
+			# Trường nghiệp vụ để `set_on_select.from_key` lấy (vd điền mã sang ô khác).
+			'vendor_code': row.get('vendorCode'),
+			'vendor_name': row.get('vendorName'),
+		}
+		for row in matched[:page_size]
+	]
+	return success_response(data=items, message=_('Search completed.'))
+
+
 def chart(request, header, params=None):
 	# TODO: tính labels/values từ data thật. Mẫu demo: đếm Đạt/Không đạt.
 	_payload = base_system._load_details_payload(header)
