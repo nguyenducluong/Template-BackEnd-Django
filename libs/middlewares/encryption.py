@@ -85,7 +85,12 @@ class EncryptionMiddleware(MiddlewareMixin):
                             query[key] = value if isinstance(value, str) else json.dumps(value)
                     request.GET = query
                     request.META["QUERY_STRING"] = query.urlencode()
-                except (ValueError, CryptoError) as exc:
+                except (ValueError, CryptoError, TypeError, AttributeError, KeyError) as exc:
+                    # `ValueError` bắt json/base64 lỗi; `CryptoError` bắt giải mã
+                    # hỏng. Thêm TypeError/AttributeError/KeyError vì `wire` là
+                    # dữ liệu NGƯỜI DÙNG gửi lên: bắt được `{"key": 123}` hay
+                    # `{"payload": {"x":1}}` (type lệch) thì ngoài ValueError sẽ
+                    # ném exception khác lọt lên ⇒ HTTP 500 thay vì 400 sạch.
                     return self._reject(request, str(exc))
             return None
         session_id = request.headers.get("X-Session-Id")

@@ -262,14 +262,14 @@ DETAILS = {
 						"show": True,
 						"label": "@dialog.dlg_input_system.sections.3.label",
 						"config": {
-							"aspect": 1.7777777778,  # 16/9
+							"aspect": 16/9,  # 16/9
 							"max_images": 6,
 							"max_size_mb": 10,      # chặn sớm ảnh quá nặng (trước khi nén)
 							"target_size_mb": 0.8,  # dung lượng đích sau khi nén (mỗi ảnh)
 							"max_dimension": 1920,   # cạnh dài tối đa sau khi nén
 							"error_key": "dialog_files",
 						},
-						"validate": {"max_images": 6},
+						"validate": {"max_images": 15},
 					},
 				],
 				"actions": [
@@ -384,16 +384,16 @@ DETAILS = {
 			],
 			# ═══ dialog_item_rows → section type=table trong dialog (data_source=static)
 		# ═══ id để cấn cho cốt chọn nhiều dòng (dialog_values['selected_item_ids'])
-		"dialog_item_rows": [
-			{"id": 1, "code": "ITM-001", "name": "Connector 20P", "unit": "PCS", "qty": 1200, "status": "active"},
-			{"id": 2, "code": "ITM-002", "name": "Housing 12V", "unit": "PCS", "qty": 850, "status": "active"},
-			{"id": 3, "code": "ITM-003", "name": "Terminal Block", "unit": "PCS", "qty": 430, "status": "inactive"},
-			{"id": 4, "code": "ITM-004", "name": "Cable Shield 200mm", "unit": "M", "qty": 2760, "status": "active"},
-			{"id": 5, "code": "ITM-005", "name": "Fuse 5A", "unit": "PCS", "qty": 320, "status": "inactive"},
-			{"id": 6, "code": "ITM-006", "name": "Bracket Left", "unit": "PCS", "qty": 640, "status": "active"},
-			{"id": 7, "code": "ITM-007", "name": "Bracket Right", "unit": "PCS", "qty": 640, "status": "active"},
-			{"id": 8, "code": "ITM-008", "name": "Gasket Rubber", "unit": "PCS", "qty": 158, "status": "inactive"},
-		],
+			"dialog_item_rows": [
+				{"id": 1, "code": "ITM-001", "name": "Connector 20P", "unit": "PCS", "qty": 1200, "status": "active"},
+				{"id": 2, "code": "ITM-002", "name": "Housing 12V", "unit": "PCS", "qty": 850, "status": "active"},
+				{"id": 3, "code": "ITM-003", "name": "Terminal Block", "unit": "PCS", "qty": 430, "status": "inactive"},
+				{"id": 4, "code": "ITM-004", "name": "Cable Shield 200mm", "unit": "M", "qty": 2760, "status": "active"},
+				{"id": 5, "code": "ITM-005", "name": "Fuse 5A", "unit": "PCS", "qty": 320, "status": "inactive"},
+				{"id": 6, "code": "ITM-006", "name": "Bracket Left", "unit": "PCS", "qty": 640, "status": "active"},
+				{"id": 7, "code": "ITM-007", "name": "Bracket Right", "unit": "PCS", "qty": 640, "status": "active"},
+				{"id": 8, "code": "ITM-008", "name": "Gasket Rubber", "unit": "PCS", "qty": 158, "status": "inactive"},
+			],
 		# ═══ kpi_table_data → layout type: table_kpi (row → subGroups[] → details[]) ═══
 			"kpi_table_data": [
 				{

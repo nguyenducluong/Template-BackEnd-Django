@@ -30,7 +30,7 @@ Quy ước: KHÔNG dùng PUT / PATCH / DELETE — xem ``libs/http_policy.py``.
 
 import logging
 
-from django.db import transaction
+from django.db import DEFAULT_DB_ALIAS, router, transaction
 from django.db.models import Q
 from django.utils.translation import gettext as _
 
@@ -295,7 +295,10 @@ def _handle_reorder(config, user, data):
 
     model = config["model"]
     updated = 0
-    with transaction.atomic():
+    # Mở transaction trên ĐÚNG alias của model. Dự án dùng PostgreSQL
+    # multi-schema: `atomic()` không tham số sẽ mở trên `default` còn query
+    # chạy trên `schema_info` ⇒ rollback/ghi không atomic thật sự.
+    with transaction.atomic(using=router.db_for_write(model) or DEFAULT_DB_ALIAS):
         for index, pk in enumerate(ids, start=1):
             updated += model.objects.filter(pk=pk).update(sort=index)
 

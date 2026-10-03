@@ -8,6 +8,11 @@ urlpatterns = [
     path("auth/unlock", views.UnlockView.as_view(), name="auth-unlock"),
     path("auth/refresh", views.RefreshTokenView.as_view(), name="auth-refresh"),
     path("auth/logout", views.LogoutView.as_view(), name="auth-logout"),
+    # Đăng xuất MỌI thiết bị + quản lý phiên (spec §18/§19/§20).
+    # `sessions/revoke` dùng POST chứ không DELETE — dự án cấm HTTP DELETE.
+    path("auth/logout-all", views.LogoutAllView.as_view(), name="auth-logout-all"),
+    path("auth/sessions", views.SessionListView.as_view(), name="auth-sessions"),
+    path("auth/sessions/revoke", views.SessionRevokeView.as_view(), name="auth-sessions-revoke"),
     path("auth/me", views.MeView.as_view(), name="auth-me"),
     path("auth/change-password", views.ChangePasswordView.as_view(), name="auth-change-password"),
     path("auth/forgot-password", views.ForgotPasswordView.as_view(), name="auth-forgot-password"),

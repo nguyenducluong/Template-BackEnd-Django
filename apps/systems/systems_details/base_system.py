@@ -28,6 +28,10 @@ from apps.systems.systems_details.translations import translate_payload
 
 logger = logging.getLogger("apps")
 
+# Trần số dòng trả về cho 1 lần gọi có phân trang (`query.limit`). Client tự ý
+# đòi `limit=1000000` sẽ ngốn RAM/response nên phải chặn trên.
+MAX_PAGE_SIZE = 500
+
 
 # ---------------------------------------------------------------------------
 # Mock generators (thay bằng query thật khi triển khai nghiệp vụ)
@@ -263,6 +267,36 @@ def _build_history(payload):
     return [{"label": label, "color": "success", "is_active": True, "dialog_id": active_id, "row": [], "data": {}}]
 
 
+def _coerce_pagination(query):
+    """Đọc `limit`/`offset` từ query của client, trả về cặp int đã AN TOÀN.
+
+    VÌ SAO CẦN (bug đã xảy ra): `query` đến từ JSON body ⇒ `limit`/`offset`
+    là CHUỖI và có thể là rác:
+      - `int("abc")` ném ValueError ⇒ HTTP 500 cho 1 request hợp lệ về mặt
+        nghiệp vụ (client gõ sai ô phân trang).
+      - `limit`/`offset` ÂM cắt list NGƯỢC: `rows[-1:-1+50]` không trả rỗng mà
+        trả dữ liệu sai lệch — tệ hơn cả lỗi 500 vì client tưởng là dữ liệu thật.
+      - `limit` khổng lồ ngốn RAM/response.
+
+    Quy tắc: giá trị rác/≤0 ⇒ MẶC ĐỊNH; giá trị hợp lệ ⇒ clamp về [1, MAX].
+    """
+    default_limit, default_offset = 50, 0
+    try:
+        limit = int((query or {}).get("limit") or default_limit)
+    except (TypeError, ValueError):
+        limit = default_limit
+    try:
+        offset = int((query or {}).get("offset") or default_offset)
+    except (TypeError, ValueError):
+        offset = default_offset
+    # Âm/0 = client tính sai ⇒ về mặc định chứ không ép về 1 dòng.
+    if limit <= 0:
+        limit = default_limit
+    if offset < 0:
+        offset = default_offset
+    return min(limit, MAX_PAGE_SIZE), offset
+
+
 def details(request, header, params=None):
     """Dữ liệu view chi tiết theo header — đọc từ payload.py riêng của từng hệ thống.
 
@@ -298,8 +332,7 @@ def details(request, header, params=None):
     data = copy.deepcopy(payload["data"])
     table = data.setdefault("table", {})
     rows = table.get("table_data") or []
-    limit = int(query.get("limit") or 50)
-    offset = int(query.get("offset") or 0)
+    limit, offset = _coerce_pagination(query)
     table["table_data"] = rows[offset : offset + limit]
     data["total_rows"] = len(rows)
     data["history"] = _build_history(payload)

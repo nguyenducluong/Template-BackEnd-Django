@@ -109,3 +109,21 @@ class NotFoundError(APIException):
     status_code = status.HTTP_404_NOT_FOUND
     default_detail = _("Resource not found.")
     default_code = "not_found"
+
+
+class AuthRefreshError(APIException):
+    """Lỗi của luồng refresh token — luôn trả **401**, không phải 400.
+
+    VÌ SAO KHÔNG DÙNG `serializers.ValidationError` (400):
+    Spec §23 yêu cầu 401 cho "refresh token invalid / revoked / expired /
+    reuse detected". Nếu để 400 thì client không phân biệt được "sai dữ liệu
+    gửi lên" với "phiên đã chết" ⇒ dễ xử lý sai (ví dụ coi là lỗi mạng rồi
+    retry vô ích).
+
+    `detail` là dict `{"code": ..., "detail": ...}` để `custom_exception_handler`
+    trả nguyên vào `errors`, FE đọc `errors.code` thay vì đoán câu chữ.
+    """
+
+    status_code = status.HTTP_401_UNAUTHORIZED
+    default_detail = _("Refresh token is not valid.")
+    default_code = "auth_refresh_token_invalid"

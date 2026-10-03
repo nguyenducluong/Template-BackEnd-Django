@@ -166,6 +166,7 @@ Mapping được khai báo trong `config/settings/base.py`:
 DB_SCHEMAS = {
     "accounts.user": "user",
     "accounts.jwtblacklist": "user",
+    "accounts.refreshtokensession": "user",
     "face.faceembedding": "face_id",
     "info.organization": "info",
     # ... các model info khác
@@ -203,6 +204,26 @@ Command này (`apps/core/management/commands/migrate_schemas.py`) tự động:
 5. **`migrate face`** → tạo `face_id.face_embeddings`, FK sang `"user"._0010_user` OK.
 
 Command **idempotent** — chạy lại sẽ no-op an toàn. `manage.py check` dùng để kiểm tra cấu hình.
+
+> #### ⚠️ TUYỆT ĐỐI KHÔNG chạy `python manage.py migrate` cho app có mapping schema
+>
+> `manage.py migrate` (không có đuôi `_schemas`) chạy trên connection `default`
+> ⇒ ghi record vào **`public.django_migrations`**, trong khi bảng thật nằm ở
+> schema `user`/`info`/`face_id` và record của nó nằm ở
+> **`user.django_migrations`**. Hai bảng `django_migrations` là độc lập, nên:
+>
+> - `migrate` báo **"No migrations to apply"** vì đã thấy record của mình ở `public`,
+>   trong khi schema `user` **chưa** có migration đó;
+> - hoặc ngược lại, nó ghi record ở `public` nhưng `ALTER TABLE` không chạm đúng
+>   bảng ở schema đích.
+>
+> Triệu chứng đã gặp thực tế: `column "_0010_user.org_id" does not exist` — vì
+> record `accounts.0002_initial` nằm ở `public.django_migrations` nên Django tưởng
+> đã apply, bỏ qua việc thêm cột `org_id`/`shift_id` vào `"user"._0010_user`.
+>
+> **Cách sửa khi gặp triệu chứng trên:** chỉ cần chạy
+> `python manage.py migrate_schemas` — nó chạy đúng connection `schema_*` và sẽ
+> áp các migration còn thiếu vào đúng schema.
 
 ### Thêm app / model mới
 

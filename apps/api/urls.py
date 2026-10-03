@@ -10,7 +10,9 @@ urlpatterns = [
     path("face/", include("apps.face.urls")),
     path("ai/", include("apps.ai.urls")),
     path("systems/", include("apps.systems.urls")),
-    # Tương thích route Laravel / các test E2E dùng tiền tố số ít: /api/v1/system/...
+    # KHÔNG có alias `system/` (số ít). Trước đây comment ở đây nói là có alias
+    # cho route Laravel, nhưng code KHÔNG hề khai ⇒ mọi URL `/api/v1/system/...`
+    # trả 404. Tiền tố đúng là `systems/`.
     path("crypto/", include("apps.api.crypto_urls")),
     path("health/", include("apps.api.health_urls")),
 ]

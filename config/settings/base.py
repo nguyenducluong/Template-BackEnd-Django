@@ -135,6 +135,12 @@ DB_SCHEMAS = {
     # accounts
     "accounts.user": "user",
     "accounts.jwtblacklist": "user",
+    # PHIÊN REFRESH — cùng schema `user` với User.
+    # KHÔNG map ⇒ SchemaRouter trả "no opinion" ⇒ bảng `_0042_refresh_token_session`
+    # bị tạo ở schema `public` (DB_DEFAULT_SCHEMA), tách rời khỏi `_0010_user`.
+    # Dù chạy được (search_path có cả 2) thì mất tính nhất quán: purge task, index
+    # và backup đều phải biết bảng này nằm ở đâu.
+    "accounts.refreshtokensession": "user",
     # face
     "face.faceembedding": "face_id",
     # info
@@ -309,6 +315,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "accounts.purge_expired_jwt_blacklist",
         "schedule": 24 * 60 * 60,  # 1 lần/ngày
     },
+    # Dọn phiên refresh token đã hết hạn từ lâu (bảng _0042_refresh_token_session).
+    # Bảng này tăng 1 dòng mỗi lần refresh; không có job thì phình vô hạn.
+    "accounts-purge-expired-refresh-sessions": {
+        "task": "accounts.purge_expired_refresh_sessions",
+        "schedule": 24 * 60 * 60,  # 1 lần/ngày
+    },
 }
 
 # Django REST Framework
@@ -324,6 +336,10 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "crypto_handshake": env("THROTTLE_CRYPTO_HANDSHAKE", default="10/min"),
         "auth": env("THROTTLE_AUTH", default="10/min"),
+        # Refresh token được gọi tự động theo vòng đời access token (15 phút)
+        # và mỗi lần app quay lại tab. Tách khỏi `auth` để nhiều người dùng
+        # cùng IP (văn phòng/NAT) không tự throttle lẫn nhau.
+        "auth_refresh": env("THROTTLE_AUTH_REFRESH", default="60/min"),
         "login": env("THROTTLE_LOGIN", default="5/min"),
         "register": env("THROTTLE_REGISTER", default="3/hour"),
         "me": env("THROTTLE_ME", default="60/min"),
@@ -370,18 +386,33 @@ JWT_AUTH = {
     "USER_ID_CLAIM": "user_id",
 }
 
-# Khoang an han cho refresh token vua bi xoay (giay).
+# ---------------------------------------------------------------------------
+# Refresh token: luoi hai cap (idle + absolute) — xem libs/auth/refresh_tokens.py
+# ---------------------------------------------------------------------------
+# REFRESH_IDLE_SECONDS: khong dung app trong bao lau thi het phien (mac dinh 7 ngay).
+REFRESH_IDLE_SECONDS = env.int("REFRESH_IDLE_SECONDS", default=7 * 24 * 3600)
+
+# REFRESH_ABSOLUTE_SECONDS: phien toi da tu luc LOGIN, KHONG reset khi xoay token
+# => dung app lien tuc cung khong keo dai duoc phien vo han (mac dinh 30 ngay).
+REFRESH_ABSOLUTE_SECONDS = env.int("REFRESH_ABSOLUTE_SECONDS", default=30 * 24 * 3600)
+
+# So ngay giu ban ghi da het han de doi chieu audit log (0 = xoa ngay).
+REFRESH_SESSION_KEEP_DAYS = env.int("REFRESH_SESSION_KEEP_DAYS", default=30)
+
+# Khoang an han cho refresh token vua bi xoay.
 #
-# Vi sao can: BE co token ROTATION — moi lan refresh thanh cong la blacklist
-# refresh token cu NGAY. Neu client gui refresh, server xoay xong nhung response
-# khong toi duoc client (F5 giua chung lam trinh duyet huy request), client van
-# con token CU (da bi blacklist) -> lan sau nhan 400 va bi dang xuat oan du
-# token con han 7 ngay.
+# DA BO (default=0): luong refresh chuyen sang TOKEN FAMILY (bang
+# `_0042_refresh_token_session`), noi trang thai la thuoc tinh cua tung token
+# (`revoked_at` + `replaced_by`). Token da xoay ma gui lai = TAI SU DUNG ->
+# thu hoi ca family -> 401.
 #
-# Trong khoang nay, token vua bi xoay van duoc chap nhan. Doi lai: ke danh cap
-# token cu cung dung duoc trong khoang do — day la cach lam chuan (Auth0
-# 'refresh token reuse interval'). Dat 0 de TAT hoan toan (quay ve hanh vi cu).
-JWT_REFRESH_REUSE_GRACE_SECONDS = env.int("JWT_REFRESH_REUSE_GRACE_SECONDS", default=60)
+# Cach cu "dem nguoc gio" (created_at >= now - 60s) chinh la nguyen nhan goc cua
+# loi "token con han 7 ngay bi logout oan": client quay lai app sau 5 phut thi
+# vuot 60s. Phan biet bang TRANG THAI dung o moi truong hop, khong con phu thuoc
+# thoi gian.
+#
+# Giu bien nay de rollback an toan ma khong phai revert code.
+JWT_REFRESH_REUSE_GRACE_SECONDS = env.int("JWT_REFRESH_REUSE_GRACE_SECONDS", default=0)
 
 # Rate Limiting (Phase 1a)
 LOGIN_RATE_LIMIT = env.int("LOGIN_RATE_LIMIT", default=5)  # requests per window

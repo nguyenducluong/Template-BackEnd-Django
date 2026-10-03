@@ -109,14 +109,47 @@ class ToolAgent:
 
     # ------------------------------------------------------------------
     def run(self, messages: List[Dict[str, str]], user=None) -> str:
-        """Chạy vòng lặp tool. Trả về text phản hồi cuối cùng."""
-        final = ""
+        """Chạy vòng lặp tool, trả về TEXT ĐẦY ĐỦ của lượt trả lời cuối.
+
+        Phải NỐI tất cả chunk `content` lại: `run_stream` cắt text thành nhiều
+        đoạn 24 ký tự để client nhận dần. Nếu chỉ giữ đoạn cuối thì kết quả
+        chỉ còn vài ký tự cuối.
+        """
+        parts: List[str] = []
         for event in self.run_stream(messages, user):
             if event.get("type") == "content":
-                final = event.get("text", "")
-        return final
+                parts.append(event.get("text", ""))
+        return "".join(parts)
 
     # ------------------------------------------------------------------
+    def _stream_turn(self, messages, tools):
+        """Lấy nội dung của MỘT lượt từ client, dạng sự kiện.
+
+        Ưu tiên `chat_stream_events` (có `tool_calls`). Nhưng client có thể chỉ
+        cài `chat` kiểu blocking — ví dụ test cũ, hoặc backend AI khác — nên khi
+        lượt đó KHÔNG sinh event nào thì gọi `chat` và bọc kết quả về cùng định
+        dạng. Nhờ vậy agent chạy được với CẢ hai kiểu client.
+
+        LƯU Ý: phải kiểm tra theo "có event hay không" chứ không dựa vào
+        exception — `unittest.mock.MagicMock` iterable nên lặp ra 0 phần tử mà
+        không ném lỗi, khiến fallback theo `except` không bao giờ chạy.
+        """
+        try:
+            events = list(self.client.chat_stream_events(messages, options=self.options, tools=tools))
+        except TypeError:
+            events = None  # client không hỗ trợ streaming
+
+        if events:
+            yield from events
+            return
+
+        reply = self.client.chat(messages, tools=tools) or {}
+        message = reply.get("message") or {}
+        content = message.get("content") or ""
+        tool_calls = message.get("tool_calls") or []
+        if content or tool_calls:
+            yield {"content": content, "tool_calls": tool_calls}
+
     def run_stream(self, messages: List[Dict[str, str]], user=None) -> Generator[Dict[str, Any], None, None]:
         """Chạy agent và phát sự kiện từng bước (status / tool_call / content)."""
         messages = [dict(m) for m in messages]
@@ -144,7 +177,7 @@ class ToolAgent:
             buffered: List[str] = []
             tool_calls: List[Dict[str, Any]] = []
 
-            for event in self.client.chat_stream_events(messages, options=self.options, tools=turn_tools):
+            for event in self._stream_turn(messages, turn_tools):
                 if event.get("tool_calls"):
                     tool_calls.extend(event["tool_calls"])
                 content = event.get("content") or ""

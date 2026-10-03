@@ -2,7 +2,6 @@ from django.utils.translation import gettext as _
 from rest_framework import serializers
 
 from .models import User
-from libs.auth.jwt_utils import rotate_refresh_token
 
 
 class LoginSerializer(serializers.Serializer):
@@ -81,26 +80,81 @@ class UnlockSerializer(serializers.Serializer):
         return attrs
 
 
-class TokenRefreshSerializer(serializers.Serializer):
-    """Refresh a JWT access token using a valid refresh token."""
+def read_refresh_token(request) -> str:
+    """Lấy refresh token từ request, ưu tiên header `Authorization: Bearer`.
 
-    refresh = serializers.CharField()
+    VÌ SAO ƯU TIÊN HEADER:
+    - `libs/auth/refresh_tokens.py` sinh token OPAQUE có tiền tố `rt_`. Header
+      Bearer là chỗ quy ước cho credential, tránh nhầm với access token.
+    - Endpoint này có `authentication_classes = []` nên Bearer KHÔNG bị chặn ở
+      tầng DRF.
+
+    Vẫn fallback về body cho client CŨ (đang gửi `{refresh: ...}`) — đường này
+    chỉ để deploy không làm hỏng ai, không phải đường chính.
+
+    @param request DRF request
+    @returns str chuỗi rỗng nếu không có token ở đâu cả
+    """
+    header = (request.META.get("HTTP_AUTHORIZATION") or "").strip()
+    if header:
+        parts = header.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            return parts[1].strip()
+    # Multipart / form: `params` có thể là JSON string (xem systems dispatcher).
+    data = request.data if isinstance(request.data, dict) else {}
+    return str(data.get("refresh") or "").strip()
+
+
+class TokenRefreshSerializer(serializers.Serializer):
+    """Refresh access token bằng refresh token (có rotation).
+
+    Refresh token được đọc từ `Authorization: Bearer` (fallback body) — xem
+    `read_refresh_token`.
+
+    Không gọi `rotate_refresh_token` (JWT cũ) nữa: luồng mới dùng
+    `libs/auth.refresh_tokens.rotate()` với Token Family + Reuse Detection.
+    Lỗi nghiệp vụ được ném ra kèm `code` máy đọc được để FE quyết định retry
+    hay buộc đăng nhập lại.
+    """
 
     def validate(self, attrs):
+        from libs.auth import refresh_tokens as rt
+        from libs.exceptions import AuthRefreshError
+
+        request = self.context.get("request")
+        raw_token = read_refresh_token(request) if request is not None else ""
+
+        # Token OPAQUE (tiền tố `rt_`) là luồng chính. Token KHÔNG có tiền tố là
+        # JWT cũ đã cấp trước khi lên Token Family → chuyển tiếp 1 lần sang
+        # opaque để KHÔNG đăng xuất oàn mọi phiên đang chạy lúc deploy.
+        legacy = not str(raw_token).startswith(rt.TOKEN_PREFIX)
         try:
-            access, refresh, user = rotate_refresh_token(attrs["refresh"])
-        except Exception:
-            raise serializers.ValidationError(_("Invalid or expired refresh token"))
-        attrs["user"] = user
-        attrs["access"] = access
-        attrs["refresh"] = refresh
+            result = rt.rotate_legacy_jwt(raw_token, request=request) if legacy else rt.rotate(raw_token, request=request)
+        except rt.RefreshTokenError as exc:
+            # `AuthRefreshError` (401) chứ KHÔNG phải ValidationError (400):
+            # spec §23 xếp hết lỗi refresh token vào 401.
+            raise AuthRefreshError({"code": exc.code, "detail": str(exc) or exc.code})
+
+        attrs["user"] = result["session"].user
+        attrs["access"] = result["access_token"]
+        attrs["refresh"] = result["refresh_token"]
+        attrs["session"] = result["session"]
         return attrs
 
 
 class LogoutSerializer(serializers.Serializer):
-    """Accept a refresh token and blacklist it."""
+    """Nhận refresh token (Bearer hoặc body) để thu hồi phiên.
 
-    refresh = serializers.CharField(required=True)
+    Không bắt buộc: logout phải idempotent — client gọi được kể cả khi token
+    đã chết (spec §17).
+    """
+
+    refresh = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        attrs["raw_token"] = read_refresh_token(request) if request is not None else ""
+        return attrs
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -208,6 +262,16 @@ class ChangePasswordSerializer(serializers.Serializer):
         return attrs
 
 
+class RevokeSessionSerializer(serializers.Serializer):
+    """Body cho `POST /accounts/auth/sessions/revoke`.
+
+    VÌ SAO POST mà không DELETE: dự án CẤM HTTP DELETE ở cả 3 tầng
+    (`libs/http_policy.py`, Nginx `limit_except`, ESLint). Xem `.clinerules`.
+    """
+
+    session_id = serializers.UUIDField()
+
+
 class ForgotPasswordSerializer(serializers.Serializer):
     """Validate account identifier and trigger OTP generation."""
 
@@ -284,16 +348,26 @@ def get_client_ip(request) -> str:
 
 
 def build_user_info(request, user) -> dict:
-    """Dựng object `user_info` trả về frontend — shape khớp Laravel."""
+    """Dựng object `user_info` trả về frontend — shape khớp Laravel.
+
+    `org_full_name` phải lấy `org.cached_full_name` (đường dẫn đầy đủ
+    "IQC 2P => IQC G => SET QC Team => Incoming MEC") để KHỚP với
+    `UserSerializer.org_full_name` và với `Organization.full_name`. Trước đây
+    chỗ này lấy `org.name` ⇒ cùng một key mà hai nơi trả hai giá trị khác nhau
+    (header hiển thị "Incoming MEC" còn bảng chi tiết hiển thị cả đường dẫn).
+    """
     language = getattr(request, "LANGUAGE_CODE", None) or "vi"
     labels = STATUS_LABELS.get(user.status) or {}
+    org_full_name = ""
+    if user.org_id:
+        org_full_name = user.org.cached_full_name or user.org.name or ""
     return {
         "gen_id": user.gen_id,
         "knox_id": user.knox_id,
         "full_name": user.full_name,
         "status": user.status,
         "org_id": user.org_id,
-        "org_full_name": user.org.name if user.org_id and user.org else "",
+        "org_full_name": org_full_name,
         "shift_id": user.shift_id,
         "change_pw_at": (
             user.change_pw_at.strftime("%Y-%m-%d %H:%M:%S")

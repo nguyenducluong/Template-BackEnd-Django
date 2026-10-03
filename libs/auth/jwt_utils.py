@@ -71,10 +71,18 @@ def _build_payload(user, token_type: str, lifetime: timedelta) -> Dict[str, Any]
 # Token generation
 # ---------------------------------------------------------------------------
 
-def generate_access_token(user) -> str:
-    """Create a signed access-token string for *user*."""
+def generate_access_token(user, sid: str = None) -> str:
+    """Create a signed access-token string for *user*.
+
+    `sid` = id của phiên refresh (xem `libs/auth/refresh_tokens.py`). Được đưa
+    vào token để khi điều tra sự cố (token bị lộ, reuse) có thể truy ngược
+    chính xác phiên nào đang bị dùng, không chỉ biết user (spec §46).
+    KHÔNG đưa refresh token vào JWT.
+    """
     cfg = _get_config()
     payload = _build_payload(user, "access", cfg["ACCESS_TOKEN_LIFETIME"])
+    if sid:
+        payload["sid"] = str(sid)
     return jwt.encode(payload, cfg["SIGNING_KEY"], algorithm=cfg["ALGORITHM"])
 
 

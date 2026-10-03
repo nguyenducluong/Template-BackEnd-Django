@@ -1,6 +1,5 @@
 from django.utils.translation import gettext as _
 from rest_framework import generics, permissions, status
-from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.conf import settings
 from django.utils import timezone
@@ -8,6 +7,8 @@ from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 
 from .models import User
+from .services.auth_service import AuthService
+from .services.session_service import get_current_session_id, list_sessions
 from services.redis_service import RedisService
 from .serializers import (
     ChangePasswordSerializer,
@@ -17,6 +18,7 @@ from .serializers import (
     RegisterSerializer,
     RequiredOtpUnlockSerializer,
     ResetPasswordSerializer,
+    RevokeSessionSerializer,
     TokenRefreshSerializer,
     UnlockSerializer,
     UserSerializer,
@@ -24,7 +26,6 @@ from .serializers import (
     build_user_info,
 )
 from libs.responses import created_response, error_response, success_response
-from libs.auth.jwt_utils import blacklist_token, generate_tokens
 from libs.auth.throttling import (
     LoginRateThrottle,
     RegisterRateThrottle,
@@ -78,7 +79,9 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
-        tokens = generate_tokens(user)
+        # Mỗi lần login tạo family refresh MỚI (không dùng `generate_tokens`
+        # của JWT cũ) — xem `AuthService.login`.
+        tokens = AuthService.login(user, request=request)
         return success_response(
             data={
                 "access": tokens["access"],
@@ -120,14 +123,21 @@ class UnlockView(APIView):
 
 @extend_schema(tags=["Authentication"])
 class RefreshTokenView(APIView):
-    """Refresh an access token using a valid refresh token (rotation enabled)."""
+    """Cấp access token mới bằng refresh token (có ROTATION + reuse detection).
 
-    # Refresh token trong body la credential — khong duoc de Bearer header
-    # (co the chua access token het han) chan request o tang authentication
+    Refresh token nhận từ `Authorization: Bearer <rt_...>` (fallback body).
+    Endpoint có `authentication_classes = []` nên Bearer không bị chặn ở tầng
+    DRF — ta tự đọc header trong serializer.
+    """
+
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
     throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "auth"
+    # Refresh là endpoint được gọi TỰ ĐỘNG (mỗi ~15 phút, mỗi tab, mỗi lần 401).
+    # Nếu dùng chung scope `auth` với login (10/min theo IP) thì một văn phòng
+    # có nhiều máy cùng IP sẽ tự throttle lẫn nhau — user bị logout oang vì lỗi
+    # 429 trong khi token vẫn hợp lệ. Vì vậy tách scope riêng, rộng hơn.
+    throttle_scope = "auth_refresh"
     http_method_names = ["post", "options"]
 
     @extend_schema(
@@ -142,19 +152,17 @@ class RefreshTokenView(APIView):
         }},
     )
     def post(self, request):
-        serializer = TokenRefreshSerializer(data=request.data)
+        serializer = TokenRefreshSerializer(data=request.data or {}, context={"request": request})
+        # Token đã bị XOAY ngay trong `rotate()` (serializer.validate).
+        # Tới đây chỉ lấy ra trả về — KHÔNG xoay thêm lần nữa.
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
-        # Token da duoc xoay NGAY TAI BUOC validate cua serializer.
-        # Den day chi lay ra dung, KHONG xoay them lan nua.
-        access = serializer.validated_data["access"]
-        refresh = serializer.validated_data["refresh"]
         return success_response(
             data={
-                "access": access,
-                "refresh": refresh,
+                "access": serializer.validated_data["access"],
+                "refresh": serializer.validated_data["refresh"],
                 "user": UserSerializer(user).data,
-                # Port từ Laravel: user_info + auth_page cho silent-refresh
+                # Port từ Laravel: user_info + auth_page điều hướng frontend
                 "user_info": build_user_info(request, user),
                 "auth_page": "change_password" if user.keyCheck == 1 else "user_info",
             },
@@ -164,7 +172,11 @@ class RefreshTokenView(APIView):
 
 @extend_schema(tags=["Authentication"])
 class LogoutView(APIView):
-    """Blacklist a refresh token to force logout."""
+    """Thu hồi phiên của THIẾT BỊ HIỆN TẠI (spec §17).
+
+    Idempotent: token không tồn tại / đã thu hồi vẫn trả success, để client
+    không bị kẹt ở trạng thái "đã đăng nhập" dù token đã chết.
+    """
 
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
@@ -180,10 +192,82 @@ class LogoutView(APIView):
         }},
     )
     def post(self, request):
-        serializer = LogoutSerializer(data=request.data)
+        serializer = LogoutSerializer(data=request.data or {}, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        blacklist_token(serializer.validated_data["refresh"])
-        return success_response(data=None, message=_("Logout successful"))
+        revoked = AuthService.logout(serializer.validated_data.get("raw_token"))
+        return success_response(
+            data={"detail": _("Logout successful")},
+            message=_("Logout successful"),
+            meta={"revoked": revoked},
+        )
+
+
+@extend_schema(tags=["Authentication"])
+class LogoutAllView(APIView):
+    """Thu hồi MỌI phiên của user (INVARIANT 9 — spec §18).
+
+    Yêu cầu access token hợp lệ: không có nó thì không biết thu hồi phiên nào.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth"
+    http_method_names = ["post", "options"]
+
+    @extend_schema(request=None, responses={200: dict})
+    def post(self, request):
+        count = AuthService.logout_all(request.user)
+        return success_response(
+            data={"revoked": count},
+            message=_("All sessions have been signed out."),
+        )
+
+
+@extend_schema(tags=["Authentication"])
+class SessionListView(APIView):
+    """Danh sách thiết bị đang đăng nhập (spec §19).
+
+    KHÔNG trả `token_hash` hay refresh token ở bất kỳ hình thức nào.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "me"
+    http_method_names = ["get", "options"]
+
+    @extend_schema(responses={200: dict})
+    def get(self, request):
+        sessions = list_sessions(request.user, current_session_id=get_current_session_id(request))
+        return success_response(data=sessions, message=_("Success"))
+
+
+@extend_schema(tags=["Authentication"])
+class SessionRevokeView(APIView):
+    """Thu hồi 1 phiên cụ thể (spec §20).
+
+    Dùng POST chứ không DELETE vì dự án cấm HTTP DELETE ở cả 3 tầng
+    (Nginx `limit_except`, `libs/http_policy.py`, ESLint).
+
+    Chỉ chủ phiên mới được thu hồi; trường hợp khác trả 404 mà KHÔNG lộ việc
+    phiên đó có tồn tại hay thuộc user nào.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth"
+    http_method_names = ["post", "options"]
+
+    @extend_schema(request=RevokeSessionSerializer, responses={200: dict, 404: dict})
+    def post(self, request):
+        serializer = RevokeSessionSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        session_id = serializer.validated_data["session_id"]
+        if not AuthService.revoke_session(request.user, session_id):
+            return error_response(
+                message=_("Session not found."),
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return success_response(data={"session_id": str(session_id)}, message=_("Session revoked."))
 
 
 @extend_schema(tags=["Authentication"])
@@ -240,6 +324,11 @@ class ChangePasswordView(APIView):
         user.change_pw_at = timezone.now()
         user.save(update_fields=["password", "change_pw_at"])
 
+        # INVARIANT 10 (spec §21): đổi mật khẩu ⇒ thu hồi MỌI phiên refresh.
+        # Nếu giữ lại, ai có refresh token trên thiết bị khác vẫn vào được hệ
+        # thống bằng mật khẩu CŨ. Client phải đăng nhập lại bằng mật khẩu mới.
+        revoked_sessions = AuthService.logout_all(user)
+
         return success_response(
             data={
                 "detail": _("Password changed successfully"),
@@ -247,6 +336,8 @@ class ChangePasswordView(APIView):
                 # Port từ Laravel: sau khi đổi mật khẩu → cấp user_info mới + vào hệ thống
                 "user_info": build_user_info(request, user),
                 "auth_page": "user_info",
+                # Báo rõ cho FE biết phải buộc đăng nhập lại.
+                "sessions_revoked": revoked_sessions,
             },
             message=_("Password changed successfully"),
         )

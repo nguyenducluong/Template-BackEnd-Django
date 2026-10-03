@@ -8,14 +8,11 @@ Header 10000 — Demo (KHÔNG dùng production, KHÔNG cần DB/quyền).
   Bypass quyền demo: dùng header demo tại chỗ, không get_object_or_404 DB.
 """
 
-from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext as _
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status
-from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.info.models import SystemHeader
 from apps.info.permissions import HasHeaderPermission
 from apps.systems.systems_details import base_system
 from apps.systems.systems_details.base_system import (  # noqa: F401
@@ -25,7 +22,10 @@ from apps.systems.systems_details.base_system import (  # noqa: F401
 	details,
 	download,
 	search,
-	submit_form,
+	# `submit_form` KHÔNG override ở đây nhưng VẪN phải re-export: dispatcher
+	# `apps/systems/views.py` gọi `getattr(module, func)` — thiếu tên này thì
+	# `func: "submit_form"` sẽ rơi vào nhánh "Function not found" (404).
+	submit_form,  # noqa: F401
 )
 from .serializers import Header10000DetailsRequestSerializer
 from libs.auth.throttling import ScopedRateThrottle
@@ -60,8 +60,9 @@ def search(request, header, params=None):
 	rows = list(_table.get('table_data') or [])
 	if wanted:
 		rows = [row for row in rows if wanted.lower() in str(row.get('vendorCode', '')).lower()]
-	limit = int(query.get('limit') or 50)
-	offset = int(query.get('offset') or 0)
+	# `limit`/`offset` từ client có thể là rác ⇒ dùng helper chuẩn hoá dùng chung
+	# (tránh `int()` thẳng gây 500 và giá trị âm cắt list ngược).
+	limit, offset = base_system._coerce_pagination(query)
 	total = len(rows)
 	return success_response(
 		data={

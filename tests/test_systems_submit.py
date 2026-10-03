@@ -148,8 +148,25 @@ class DemoHeaderBypassTests(SimpleTestCase):
         header_kr="demo", view_vi="Demo", is_mobile=False,
     )
 
+    # `values` phải THỎA MÃN validate của payload 10000:
+    #   - `action.validate.required` (base_system.py) liệt kê 7 field bắt buộc
+    #   - section `table` có `validate.min_selected = 1` ⇒ phải có
+    #     `selected_item_ids` (khoá trong `section.config.selected_key`)
+    # Thiếu bất kỳ cái nào ⇒ BE trả 400 và test này fail vì lý do không liên
+    # quan (trước đây chỉ gửi `vendor_code` nên luôn 400).
+    VALID_VALUES = {
+        "team": "22",
+        "vendor_code": "DK01",
+        "vendor_name": "DAE RIM",
+        "inspection_date": "2026-01-15",
+        "lot_no": "LOT001",
+        "defect_qty": 0,
+        "result_status": "pass",
+        "selected_item_ids": ["1"],
+    }
+
     def _demo_params(self, **overrides):
-        params = valid_params(header_id=10000, values={"vendor_code": "DK01"})
+        params = valid_params(header_id=10000, values=dict(self.VALID_VALUES))
         params.update(overrides)
         return params
 

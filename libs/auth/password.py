@@ -10,7 +10,6 @@ passwords remain portable if Django auth is ever reintroduced:
 
 import hashlib
 import hmac
-import os
 import secrets
 
 # OWASP-recommended minimum iterations (as of 2023)

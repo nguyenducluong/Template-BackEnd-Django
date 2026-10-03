@@ -4,7 +4,7 @@ Views của Systems Default — gộp các endpoint hệ thống cũ port từ L
     GET /api/v1/system/default/get_systems              → GetRegisteredSystemsView
     GET /api/v1/system/default/options_authentication    → DefineAppView (public)
 
-Mount in apps/api/urls.py: path("system/default/", include("apps.systems.default.urls"))
+Mount in apps/api/urls.py: path("systems/default/", include("apps.systems.default.urls"))
 """
 
 from django.utils.translation import gettext as _

@@ -35,13 +35,18 @@ class AuthRateThrottle(BaseThrottle):
     where there is no authenticated user yet to key on.
     """
 
+    # Tiền tố cache key. PHẢI khác nhau giữa các subclass: nếu để chung,
+    # login và register dùng chung MỘT bucket ⇒ đăng ký 3 lần sẽ chặn luôn
+    # login của cùng IP trong 1 giờ (và ngược lại).
+    cache_key_prefix = "throttle:auth"
+
     def __init__(self, max_requests: int = None, window: int = None):
         self.max_requests = max_requests or getattr(settings, "LOGIN_RATE_LIMIT", 5)
         self.window = window or getattr(settings, "LOGIN_RATE_LIMIT_WINDOW", 60)
 
     def get_cache_key(self, request, view):
         ident = _get_client_ident(request)
-        return f"throttle:auth:{ident}"
+        return f"{self.cache_key_prefix}:{ident}"
 
     def allow_request(self, request, view):
         key = self.get_cache_key(request, view)
@@ -71,6 +76,8 @@ class AuthRateThrottle(BaseThrottle):
 class LoginRateThrottle(AuthRateThrottle):
     """5 login attempts per minute per client IP."""
 
+    cache_key_prefix = "throttle:login"
+
     def __init__(self):
         super().__init__(
             max_requests=getattr(settings, "LOGIN_RATE_LIMIT", 5),
@@ -80,6 +87,8 @@ class LoginRateThrottle(AuthRateThrottle):
 
 class RegisterRateThrottle(AuthRateThrottle):
     """3 registration attempts per hour per client IP."""
+
+    cache_key_prefix = "throttle:register"
 
     def __init__(self):
         super().__init__(
