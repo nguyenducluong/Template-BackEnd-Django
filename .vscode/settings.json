@@ -9,7 +9,6 @@
 		"**/__pycache__": false,
 		"**/*.pyc": false,
 		".venv": false,
-		"**/__init__.py": false,
 		"public": false,
 		"node_modules": false
 	},
@@ -18,7 +17,6 @@
 		"**/__pycache__": false,
 		"**/*.pyc": false,
 		".venv": false,
-		"**/__init__.py": false,
 		"public": false,
 		"node_modules": false
 	},
@@ -26,7 +24,6 @@
 		"**/__pycache__": false,
 		"**/*.pyc": false,
 		".venv": false,
-		"**/__init__.py": false,
 		"public": false,
 		"node_modules": false
 	}

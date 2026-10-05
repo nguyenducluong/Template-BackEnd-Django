@@ -362,6 +362,11 @@ def build_user_info(request, user) -> dict:
     if user.org_id:
         org_full_name = user.org.cached_full_name or user.org.name or ""
     return {
+        # BẮT BUỘC có `id`: đây là khoá chính của DB, dùng để so sánh với
+    # `Message.sender_id` / `ConversationMember.user_id` phía chat. Thiếu nó thì
+        # `state.auth.user_info.id` là `undefined` ⇒ FE không xác định được tin
+        # nào là của chính mình ⇒ MỌI tin hiển thị bên trái.
+        "id": user.id,
         "gen_id": user.gen_id,
         "knox_id": user.knox_id,
         "full_name": user.full_name,

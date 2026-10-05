@@ -10,6 +10,7 @@ urlpatterns = [
     path("face/", include("apps.face.urls")),
     path("ai/", include("apps.ai.urls")),
     path("systems/", include("apps.systems.urls")),
+    path("messages/", include("apps.messages.urls")),
     # KHÔNG có alias `system/` (số ít). Trước đây comment ở đây nói là có alias
     # cho route Laravel, nhưng code KHÔNG hề khai ⇒ mọi URL `/api/v1/system/...`
     # trả 404. Tiền tố đúng là `systems/`.

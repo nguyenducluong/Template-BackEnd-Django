@@ -49,6 +49,7 @@ LOCAL_APPS = [
     "apps.info",
     "apps.ai",
     "apps.systems",
+    "apps.messages",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -256,6 +257,12 @@ REDIS_USER = env("REDIS_USER", default="")
 REDIS_PASSWORD = env("REDIS_PASSWORD", default="")
 REDIS_DB_CACHE = env.int("REDIS_DB_CACHE", default=0)
 REDIS_DB_CELERY = env.int("REDIS_DB_CELERY", default=1)
+# RESP2 (2) hay RESP3 (3) cho channel layer. Redis 6+ hỗ trợ cả hai; Redis 5.x
+# CHỈ có RESP2 ⇒ để 2. Đổi sang 3 khi đã nâng Redis lên 6 trở lên.
+REDIS_PROTOCOL = env.int("REDIS_PROTOCOL", default=2)
+# Timeout (giây) cho socket của channel layer. Phải >= 60 vì channels_redis chờ
+# event bằng `BRPOP` có timeout 60s; nếu nhỏ hơn sẽ bị TimeoutError giữa chừng.
+REDIS_SOCKET_TIMEOUT = env.int("REDIS_SOCKET_TIMEOUT", default=65)
 
 
 def _build_redis_url(db: int) -> str:
@@ -292,7 +299,23 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [_build_redis_url(REDIS_DB_CACHE)],
+            # `protocol=2` (RESP2) là BẮT BUỘC với Redis < 6.
+            #
+            # LÝ DO: `redis-py` mặc định dùng RESP3 và mở kết nối bằng lệnh
+            # `HELLO 3`. Redis 5.x (bản đi kèm XAMPP) không có lệnh này ⇒ mọi
+            # thao tác channel layer ném:
+            #     ResponseError: unknown command `HELLO`, with args beginning with: `3`
+            # và WebSocket chết ngay ở bước `group_add` (hiện ra là HTTP 403).
+            # Nâng Redis lên 6+ thì bỏ được tham số này.
+            # Timeout phải truyền trong QUERY STRING của URL (dạng
+            # `?socket_timeout=..`), KHÔNG phải keyword riêng — `RedisChannelLayer`
+            # chỉ nhận `hosts`, `prefix`, `symmetric_encryption_keys`, `expiry`
+            # nên truyền kwarg riêng sẽ ném `TypeError: unexpected keyword argument`.
+            #
+            # Giá trị phải >= thời gian chờ của `BRPOP` (channels_redis chặn 60s để
+            # nghe event); nếu nhỏ hơn, mọi lần nhận event sẽ thành
+            # `redis.exceptions.TimeoutError` và socket chết.
+            "hosts": [f"{_build_redis_url(REDIS_DB_CACHE)}?protocol={REDIS_PROTOCOL}&socket_connect_timeout={REDIS_SOCKET_TIMEOUT}&socket_timeout={REDIS_SOCKET_TIMEOUT}"],
             "symmetric_encryption_keys": [SECRET_KEY],
         },
     },
@@ -351,6 +374,8 @@ REST_FRAMEWORK = {
         "systems": env("THROTTLE_SYSTEMS", default="120/min"),
         # App info (POST /api/v1/info/dispatch, cây menu hệ thống)
         "info": env("THROTTLE_INFO", default="120/min"),
+        # App messages (POST /api/v1/messages/dispatch, chat room kin)
+        "messages": env("THROTTLE_MESSAGES", default="120/min"),
         "default": env("THROTTLE_DEFAULT", default="100/min"),
     },
     "DEFAULT_PAGINATION_CLASS": "libs.pagination.StandardPagination",
@@ -482,7 +507,7 @@ INFO_DISPATCH_ALLOWED_POWERS = env.list("INFO_DISPATCH_ALLOWED_POWERS", default=
 INFO_STRUCTURE_CACHE_TTL = env.int("INFO_STRUCTURE_CACHE_TTL", default=300)
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:3000"])
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://127.0.0.1:3000"])
 
 # URL convention: KHÔNG trailing slash cho API (frontend gọi /api/v1/... không có "/" cuối).
 # Lưu ý: /admin, /api/docs, /api/schema phải gõ đúng có "/" (CommonMiddleware không còn tự redirect)
@@ -544,6 +569,21 @@ LANGUAGE_COOKIE_SAMESITE = "Lax"
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# ----------------------------------------------------------------------------
+# App messages — giới hạn tệp đính kèm chat
+# ----------------------------------------------------------------------------
+# Ràng buộc THẬT sự nằm ở `apps/messages/services/upload.py`: đo dung lượng từ
+# file server nhận được (không tin header client) và kiểm loại file bằng magic
+# bytes. Hai giá trị dưới đây là MẶC ĐỊNH cho allow-list đó — đổi ở đây thì
+# service tự theo, không cần sửa code.
+#
+# LƯU Ý VẬN HÀNH: Django KHÔNG tự chặn cỡ file upload (chỉ áp `DATA_UPLOAD_MAX_MEMORY_SIZE`
+# cho phần không phải file). Muốn chặn cứng ở tầng web server, xem README
+# mục "Quy Ước HTTP Method" — nginx `client_max_body_size` phải >= giá trị lớn
+# nhất ở đây, nếu không nginx trả 413 trước khi request tới Django.
+CHAT_MAX_IMAGE_BYTES = env.int("CHAT_MAX_IMAGE_BYTES", default=20 * 1024 * 1024)  # 20 MB
+CHAT_MAX_FILE_BYTES = env.int("CHAT_MAX_FILE_BYTES", default=100 * 1024 * 1024)  # 100 MB
 
 # Media files
 MEDIA_URL = "media/"

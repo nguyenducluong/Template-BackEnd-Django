@@ -22,6 +22,11 @@ cryptography>=42.0.0
 psycopg2-binary>=2.9
 gunicorn>=22.0
 uvicorn>=0.29
+# BẮT BUỘC cho WebSocket: uvicorn chỉ cài được phần WebSocket khi có backend
+# `websockets` hoặc `wsproto`. Thiếu nó thì uvicorn vẫn chạy HTTP bình thường
+# nhưng mọi kết nối `ws://.../ws/chat/...` đều fail 404 / "Unsupported
+# upgrade request". `daphne` đã có sẵn WebSocket nên không cần gói này.
+websockets>=12.0
 aiohttp>=3.9
 requests>=2.31
 django-filter>=24.1
